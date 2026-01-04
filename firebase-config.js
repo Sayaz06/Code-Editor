@@ -24,12 +24,12 @@ import {
 
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyBbJL6gvJV7Tp7Q4dfQIo2PEOCf7RCxvZE",
-  authDomain: "stresskedua.firebaseapp.com",
-  projectId: "stresskedua",
-  storageBucket: "stresskedua.firebasestorage.app",
-  messagingSenderId: "796006873398",
-  appId: "1:796006873398:web:4d17e7ae3e57bdc233db97",
+  apiKey: "AIzaSyD0hCVXad77dLVERiZLQGn3ne81hQFuqCY",
+  authDomain: "stress-places.firebaseapp.com",
+  projectId: "stress-places",
+  storageBucket: "stress-places.firebasestorage.app",
+  messagingSenderId: "137115285004",
+  appId: "1:137115285004:web:02d731b7d41012a4d1e029",
 };
 
 const app = initializeApp(firebaseConfig);
