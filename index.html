@@ -51,10 +51,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #line-nums{width:44px;overflow:hidden;background:var(--surface3);border-right:1px solid var(--border);flex-shrink:0;user-select:none;-webkit-user-select:none}
 #line-nums-inner{padding:12px 0;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);color:var(--text2);text-align:right;padding-right:8px}
 #code-area{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;position:relative}
-#code-scroll-inner{min-height:100%;position:relative}
-#code-highlight{position:absolute;top:0;left:0;right:0;bottom:0;padding:12px 10px 12px 10px;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);white-space:pre;word-break:break-all;white-space:pre-wrap;pointer-events:none;color:var(--text);z-index:0}
-#code-input{position:absolute;top:0;left:0;right:0;bottom:0;width:100%;height:100%;padding:12px 10px 12px 10px;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);background:transparent;border:none;outline:none;color:transparent;caret-color:var(--accent);resize:none;z-index:1;white-space:pre;word-break:break-all;white-space:pre-wrap;-webkit-overflow-scrolling:touch}
-
+#code-scroll-inner{min-height:100%;position:relative;display:inline-block;min-width:100%}
+#code-highlight{padding:12px 40px 12px 10px;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);white-space:pre;pointer-events:none;color:var(--text);z-index:0;position:relative}
+#code-input{position:absolute;top:0;left:0;width:100%;height:100%;padding:12px 40px 12px 10px;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);background:transparent;border:none;outline:none;color:transparent;caret-color:var(--accent);resize:none;z-index:1;white-space:pre;overflow:hidden;-webkit-overflow-scrolling:touch}
+  
 /* SELECTION HIGHLIGHT */
 .sel-highlight{background:rgba(76,201,240,0.2);border-radius:2px}
 .sel-line-active{background:rgba(76,201,240,0.07)}
@@ -488,11 +488,11 @@ function setupEditor() {
 }
 
 function syncScroll() {
-  var inp = document.getElementById('code-input');
+  var area = document.getElementById('code-area');
   var hl = document.getElementById('code-highlight');
   var lnInner = document.getElementById('line-nums-inner');
-  hl.style.transform = 'translateY(-' + inp.scrollTop + 'px)';
-  lnInner.style.transform = 'translateY(-' + inp.scrollTop + 'px)';
+  hl.scrollTop = area.scrollTop;
+  lnInner.style.transform = 'translateY(-' + area.scrollTop + 'px)';
 }
 
 function renderHighlight() {
@@ -759,6 +759,10 @@ function downloadFile() {
 // SEARCH
 // ═══════════════════════════════════════
 var searchTimeout = null;
+function normalizeForSearch(str) {
+  return str.split('\n').map(function(l){ return l.trim().replace(/\s+/g,' '); }).join('\n').replace(/\n+/g,'\n').trim();
+}
+
 function doSearch() {
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(_doSearch, 200);
@@ -775,23 +779,49 @@ function _doSearch() {
   if (!query) { container.innerHTML = ''; state.searchResults = []; return; }
 
   try {
-    var flags = caseSensitive ? 'g' : 'gi';
-    var regex = useRegex ? new RegExp(query, flags) : new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), flags);
-    var lines = content.split('\n');
-    lines.forEach(function(line, idx) {
-      var m;
-      regex.lastIndex = 0;
-      if (regex.test(line)) {
-        results.push({line: idx, text: line});
+    if (useRegex) {
+      var flags = caseSensitive ? 'g' : 'gi';
+      var regex = new RegExp(query, flags);
+      var lines = content.split('\n');
+      lines.forEach(function(line, idx) {
+        regex.lastIndex = 0;
+        if (regex.test(line)) results.push({line: idx, text: line, multi: false});
+      });
+    } else {
+      var normQuery = normalizeForSearch(query);
+      var queryLines = normQuery.split('\n');
+      var contentLines = content.split('\n');
+      var isCaseSensitive = caseSensitive;
+
+      if (queryLines.length === 1) {
+        contentLines.forEach(function(line, idx) {
+          var normLine = line.trim().replace(/\s+/g,' ');
+          var a = isCaseSensitive ? normLine : normLine.toLowerCase();
+          var b = isCaseSensitive ? normQuery : normQuery.toLowerCase();
+          if (a.includes(b)) results.push({line: idx, text: line, multi: false});
+        });
+      } else {
+        for (var i = 0; i <= contentLines.length - queryLines.length; i++) {
+          var match = true;
+          for (var j = 0; j < queryLines.length; j++) {
+            var normContent = contentLines[i+j].trim().replace(/\s+/g,' ');
+            var a = isCaseSensitive ? normContent : normContent.toLowerCase();
+            var b = isCaseSensitive ? queryLines[j] : queryLines[j].toLowerCase();
+            if (!a.includes(b)) { match = false; break; }
+          }
+          if (match) results.push({line: i, text: contentLines.slice(i, i+queryLines.length).join('\n'), multi: true, span: queryLines.length});
+        }
       }
-    });
+    }
+
     state.searchResults = results;
     state.searchIdx = 0;
 
     var html = '<div class="result-count">' + results.length + ' hasil ditemui</div>';
     results.forEach(function(r, i) {
-      var hi = r.text.replace(regex, function(m) { return '<mark>' + m + '</mark>'; });
-      html += '<div class="result-item" onclick="jumpToResult(' + i + ')"><div class="result-line">Baris ' + (r.line+1) + '</div><div class="result-text">' + hi + '</div></div>';
+      var preview = r.text.length > 120 ? r.text.substring(0,120)+'...' : r.text;
+      preview = preview.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      html += '<div class="result-item" onclick="jumpToResult('+i+')"><div class="result-line">Baris '+(r.line+1)+(r.multi?' — '+(r.line+r.span):'')+'</div><div class="result-text">'+preview+'</div></div>';
     });
     container.innerHTML = html || '<div style="color:var(--text2);font-size:12px">Tiada hasil</div>';
   } catch(e) {
