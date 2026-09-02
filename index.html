@@ -865,10 +865,12 @@ function doReplace(){
     var endPos=pos;
     for(var j=firstNewStart;j<=firstNewEnd;j++) endPos+=lines[j].length+1;
     endPos=Math.min(endPos-1,el.value.length);
-    el.scrollTop=Math.max(0,(firstNewStart-3)*22);
-    syncScroll();
     el.focus();
     el.setSelectionRange(pos,endPos);
+    setTimeout(function(){
+      el.scrollTop=Math.max(0,(firstNewStart-3)*22);
+      syncScroll();
+    },50);
 
     // tunjuk bar unhighlight
     document.getElementById('replace-done-msg').textContent='✓ '+found.length+' gantian berjaya — Baris '+(firstNewStart+1);
