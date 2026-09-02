@@ -764,12 +764,10 @@ function _liveHighlight(){
   for(var j = r.startLine; j <= r.endLine; j++) endPos += lines[j].length + 1;
   endPos = Math.min(endPos - 1, el.value.length);
 
-  el.setSelectionRange(pos, endPos);
   el.scrollTop = Math.max(0, (r.startLine - 3) * 22);
   syncScroll();
   el.focus();
-  // refocus panel supaya keyboard kekal
-  setTimeout(function(){ document.getElementById('replace-find').focus(); }, 50);
+  el.setSelectionRange(pos, endPos);
 }
 
 function previewReplace(){
@@ -952,7 +950,7 @@ function showNotif(msg,type){
 document.addEventListener('keydown',function(e){
   if((e.ctrlKey||e.metaKey)&&e.key==='z'){doUndo();e.preventDefault();}
   if((e.ctrlKey||e.metaKey)&&e.key==='y'){doRedo();e.preventDefault();}
-  if((e.ctrlKey||e.metaKey)&&e.key==='f'){openPanel('search-panel');e.preventDefault();}
+  if((e.ctrlKey||e.metaKey)&&e.key==='f'){openPanel('replace-panel');e.preventDefault();}
   if((e.ctrlKey||e.metaKey)&&e.key==='h'){openPanel('replace-panel');e.preventDefault();}
   if((e.ctrlKey||e.metaKey)&&e.key==='s'){downloadFile();e.preventDefault();}
 });
