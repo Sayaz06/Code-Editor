@@ -250,7 +250,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <div class="panel-title">🔍 Cari Kod</div>
   <div class="panel-body">
     <div class="field-label">Teks untuk dicari</div>
-    <input class="field field-sm" id="search-input" placeholder="Taip teks carian..." oninput="doSearch()">
+    <textarea class="field" id="search-input" rows="3" placeholder="Taip teks carian... (boleh multiline)" oninput="doSearch()"></textarea>
     <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:12px;align-items:center">
       <label style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--text2);cursor:pointer">
         <input type="checkbox" id="search-case" onchange="doSearch()" style="accent-color:var(--accent)"> Kes sensitif
