@@ -58,8 +58,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
 /* LINE NUMBERS */
 #line-nums{width:48px;overflow:hidden;background:var(--surface3);border-right:1px solid var(--border);flex-shrink:0;user-select:none;-webkit-user-select:none;position:relative}
-#line-nums-inner{position:absolute;top:0;left:0;right:0;padding:12px 8px 12px 0;font-family:var(--font-mono);font-size:13px;color:var(--text2);text-align:right}
-#line-nums-inner div{height:var(--line-h);line-height:var(--line-h);font-size:12px}
+#line-nums-inner{position:absolute;top:0;left:0;right:0;padding:0;font-family:var(--font-mono);font-size:13px;color:var(--text2);text-align:right}
+#line-nums-inner div{height:var(--line-h);line-height:var(--line-h);font-size:12px;padding-right:8px}
 
 /* CODE AREA */
 #code-wrap{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;position:relative}
@@ -420,6 +420,7 @@ function setupEditor(){
     saveToStorage();
   });
   el.addEventListener('scroll', syncScroll);
+  document.getElementById('code-wrap').addEventListener('scroll', syncScroll);
   el.addEventListener('keyup', updateCursor);
   el.addEventListener('click', updateCursor);
   el.addEventListener('mouseup', updateCursor);
@@ -428,7 +429,15 @@ function setupEditor(){
 function syncScroll(){
   var el = inp();
   var lnInner = document.getElementById('line-nums-inner');
-  lnInner.style.top = -el.scrollTop + 'px';
+  lnInner.style.top = (12 - el.scrollTop) + 'px';
+}
+
+function afterScroll(){
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      syncScroll();
+    });
+  });
 }
 
 function updateAll(){
@@ -442,7 +451,7 @@ function updateLineNums(){
   var el = inp();
   var lines = (el.value||'').split('\n');
   var lnInner = document.getElementById('line-nums-inner');
-  var html = '<div style="height:12px"></div>';
+  var html = '<div style="height:12px;line-height:0;font-size:0"> </div>';
   for(var i=1;i<=Math.max(lines.length,1);i++){
     html += '<div>'+i+'</div>';
   }
@@ -720,10 +729,10 @@ function jumpToResult(idx){
   for(var i=0;i<r.line;i++) pos+=lines[i].length+1;
   var endPos=pos;
   for(var j=r.line;j<r.line+r.span;j++) endPos+=lines[j].length+1;
-  el.setSelectionRange(pos,Math.min(endPos-1,el.value.length));
   el.focus();
+  el.setSelectionRange(pos,Math.min(endPos-1,el.value.length));
   el.scrollTop=Math.max(0,(r.line-3)*22);
-  syncScroll();
+  afterScroll();
   S.searchIdx=idx;
 }
 
@@ -813,10 +822,10 @@ function jumpToFound(){
   var endPos = pos;
   for(var j = r.startLine; j <= r.endLine; j++) endPos += lines[j].length + 1;
   endPos = Math.min(endPos - 1, el.value.length);
-  el.scrollTop = Math.max(0, (r.startLine - 3) * 22);
-  syncScroll();
   el.focus();
   el.setSelectionRange(pos, endPos);
+  el.scrollTop = Math.max(0, (r.startLine - 3) * 22);
+  afterScroll();
   showNotif('Baris '+(r.startLine+1)+' — '+(r.endLine+1),'info');
 }
 
@@ -867,10 +876,8 @@ function doReplace(){
     endPos=Math.min(endPos-1,el.value.length);
     el.focus();
     el.setSelectionRange(pos,endPos);
-    setTimeout(function(){
-      el.scrollTop=Math.max(0,(firstNewStart-3)*22);
-      syncScroll();
-    },50);
+    el.scrollTop=Math.max(0,(firstNewStart-3)*22);
+    afterScroll();
 
     // tunjuk bar unhighlight
     document.getElementById('replace-done-msg').textContent='✓ '+found.length+' gantian berjaya — Baris '+(firstNewStart+1);
@@ -938,10 +945,8 @@ function jumpToLine(){
   for(var i=0;i<n;i++) pos+=lines[i].length+1;
   el.focus();
   el.setSelectionRange(pos,pos+lines[n].length);
-  setTimeout(function(){
-    el.scrollTop=Math.max(0,(n-3)*22);
-    syncScroll();
-  },50);
+  el.scrollTop=Math.max(0,(n-3)*22);
+  afterScroll();
   showNotif('Baris '+(n+1),'info');
 }
 
