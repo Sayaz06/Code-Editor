@@ -247,7 +247,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <div class="panel-body">
     <div class="field-label">Cari kod ini (boleh multiline, space tidak ketat)</div>
     <textarea class="field" id="replace-find" rows="4" placeholder="Tampal kod lama di sini..." oninput="liveHighlight()"></textarea>
-    <div id="find-status" style="font-size:12px;margin:6px 0;min-height:18px"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
+      <div id="find-status" style="font-size:12px;flex:1;min-height:18px"></div>
+      <button class="tool-btn" onclick="jumpToFound()" style="padding:4px 10px;flex-shrink:0">↵ Pergi</button>
+    </div>
     <div class="field-label">Ganti dengan</div>
     <textarea class="field" id="replace-with" rows="4" placeholder="Tampal kod baru di sini..."></textarea>
     <div id="replace-preview" style="margin-top:10px;display:none">
@@ -256,6 +259,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div class="compare-label new" style="margin-top:6px">+ KOD BARU</div>
       <div class="compare-new" id="preview-new"></div>
       <div style="font-size:12px;color:var(--text2);margin-top:6px" id="preview-count"></div>
+    </div>
+  </div>
+  <div id="unhighlight-bar" style="display:none;padding:8px 14px;background:rgba(6,214,160,0.1);border-top:1px solid rgba(6,214,160,0.3)">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span style="font-size:12px;color:var(--green);flex:1" id="replace-done-msg"></span>
+      <button class="tool-btn" onclick="unhighlightDone()" style="padding:4px 10px;border-color:var(--green);color:var(--green)">✕ Unhighlight</button>
     </div>
   </div>
   <div class="panel-footer" style="flex-wrap:wrap;gap:6px">
@@ -770,6 +779,8 @@ function flexFind(content, findTxt){
 // REPLACE
 // ═══════════════════════════════════
 var _lhTimer = null;
+var _foundResults = [];
+
 function liveHighlight(){
   clearTimeout(_lhTimer);
   _lhTimer = setTimeout(_liveHighlight, 300);
@@ -779,19 +790,22 @@ function _liveHighlight(){
   var findTxt = document.getElementById('replace-find').value;
   var status = document.getElementById('find-status');
   document.getElementById('replace-preview').style.display = 'none';
+  _foundResults = [];
   if(!findTxt){ status.textContent = ''; return; }
 
-  var found = flexFind(inp().value, findTxt);
-  if(!found.length){
+  _foundResults = flexFind(inp().value, findTxt);
+  if(!_foundResults.length){
     status.style.color = 'var(--red)';
     status.textContent = '✕ Tidak dijumpai';
     return;
   }
-
   status.style.color = 'var(--green)';
-  status.textContent = '✓ ' + found.length + ' kejadian dijumpai';
+  status.textContent = '✓ ' + _foundResults.length + ' kejadian — tekan ↵ Pergi';
+}
 
-  var r = found[0];
+function jumpToFound(){
+  if(!_foundResults.length){ showNotif('Isi kotak cari dahulu','err'); return; }
+  var r = _foundResults[0];
   var el = inp();
   var lines = el.value.split('\n');
   var pos = 0;
@@ -799,19 +813,11 @@ function _liveHighlight(){
   var endPos = pos;
   for(var j = r.startLine; j <= r.endLine; j++) endPos += lines[j].length + 1;
   endPos = Math.min(endPos - 1, el.value.length);
-
   el.scrollTop = Math.max(0, (r.startLine - 3) * 22);
   syncScroll();
-
-  // simpan selection, highlight editor tanpa hilangkan focus dari panel
-  el.blur();
   el.focus();
   el.setSelectionRange(pos, endPos);
-
-  // kembalikan focus ke kotak carian selepas highlight
-  setTimeout(function(){
-    document.getElementById('replace-find').focus();
-  }, 50);
+  showNotif('Baris '+(r.startLine+1)+' — '+(r.endLine+1),'info');
 }
 
 function previewReplace(){
@@ -838,17 +844,48 @@ function doReplace(){
   saveBackup(); pushUndo();
   var cLines=el.value.split('\n');
   var offset=0;
-  found.forEach(function(r){
+  var firstNewStart=-1;
+  var firstNewEnd=-1;
+  found.forEach(function(r,idx){
     var s=r.startLine-offset;
     var e=r.endLine-offset;
     var rep=withTxt.split('\n');
     cLines=cLines.slice(0,s).concat(rep).concat(cLines.slice(e+1));
+    if(idx===0){ firstNewStart=s; firstNewEnd=s+rep.length-1; }
     offset+=(r.endLine-r.startLine+1)-rep.length;
   });
   el.value=cLines.join('\n');
   updateAll(); saveToStorage();
-  closeAllPanels();
+
+  // highlight kod baru yang diganti
+  if(firstNewStart>=0){
+    var lines=el.value.split('\n');
+    var pos=0;
+    for(var i=0;i<firstNewStart;i++) pos+=lines[i].length+1;
+    var endPos=pos;
+    for(var j=firstNewStart;j<=firstNewEnd;j++) endPos+=lines[j].length+1;
+    endPos=Math.min(endPos-1,el.value.length);
+    el.scrollTop=Math.max(0,(firstNewStart-3)*22);
+    syncScroll();
+    el.focus();
+    el.setSelectionRange(pos,endPos);
+
+    // tunjuk bar unhighlight
+    document.getElementById('replace-done-msg').textContent='✓ '+found.length+' gantian berjaya — Baris '+(firstNewStart+1);
+    document.getElementById('unhighlight-bar').style.display='block';
+  }
+
+  // tutup panel tapi kekal highlight
+  document.querySelectorAll('.panel').forEach(function(p){p.classList.remove('open');});
+  document.getElementById('overlay').classList.remove('show');
   showNotif(found.length+' gantian berjaya!','ok');
+}
+
+function unhighlightDone(){
+  var el=inp();
+  el.setSelectionRange(el.selectionStart,el.selectionStart);
+  document.getElementById('unhighlight-bar').style.display='none';
+  document.getElementById('replace-done-msg').textContent='';
 }
 
 // ═══════════════════════════════════
