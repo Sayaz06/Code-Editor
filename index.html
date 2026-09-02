@@ -165,9 +165,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <!-- TOOLBAR -->
   <div id="toolbar">
     <button class="tool-btn" onclick="openPanel('replace-panel')">🔄 Ganti</button>
+    <button class="tool-btn" id="btn-pilih" onclick="toggleSelMode()">☰ Pilih</button>
     <button class="tool-btn" onclick="doUndo()">↩ Undo</button>
     <button class="tool-btn" onclick="doRedo()">↪ Redo</button>
     <button class="tool-btn" onclick="jumpToLine()">≡ Baris</button>
+    <button class="tool-btn" onclick="copyAll()">📋 Salin Semua</button>
+    <button class="tool-btn" onclick="pasteAll()">📥 Tampal Semua</button>
     <button class="tool-btn" onclick="openPanel('info-panel')">ℹ Panduan</button>
   </div>
 
@@ -457,54 +460,66 @@ function checkEmpty(){
 }
 
 // ═══════════════════════════════════
-// LONG PRESS LINE SELECT
+// MOD PILIH BARIS
 // ═══════════════════════════════════
+function lineAt(cy){
+  var el = inp();
+  var rect = el.getBoundingClientRect();
+  var relY = cy - rect.top + el.scrollTop;
+  var n = Math.floor(relY / 22);
+  var total = el.value.split('\n').length;
+  return Math.max(0, Math.min(n, total-1));
+}
+
+function toggleSelMode(){
+  S.selMode = !S.selMode;
+  S.selStart = -1;
+  S.selEnd = -1;
+  var btn = document.getElementById('btn-pilih');
+  if(S.selMode){
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#0f0f1a';
+    btn.style.borderColor = 'var(--accent)';
+    inp().style.cursor = 'crosshair';
+    showNotif('Mod Pilih ON — tap baris mula','info');
+  } else {
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+    inp().style.cursor = '';
+    document.getElementById('sel-bar').classList.remove('show');
+  }
+}
+
 function setupLongPress(){
   var el = inp();
-  var ring = document.getElementById('lp-ring');
-  var timer = null;
-  var startLine = 0;
-
-  function lineAt(ta, cx, cy){
-    var rect = ta.getBoundingClientRect();
-    var relY = cy - rect.top + ta.scrollTop;
-    var lineH = 22;
-    var n = Math.floor(relY / lineH);
-    var total = ta.value.split('\n').length;
-    return Math.max(0, Math.min(n, total-1));
-  }
-
-  el.addEventListener('touchstart', function(e){
-    var t = e.touches[0];
-    startLine = lineAt(el, t.clientX, t.clientY);
-    ring.style.left = t.clientX+'px';
-    ring.style.top = t.clientY+'px';
-    timer = setTimeout(function(){
-      S.selMode = true;
-      S.selStart = startLine;
-      S.selEnd = startLine;
-      ring.classList.add('show');
-      if(navigator.vibrate) navigator.vibrate(25);
-      showNotif('Scroll ke baris akhir, tekan sekali','info');
-      setTimeout(function(){
-        ring.classList.add('pop');
-        setTimeout(function(){ ring.classList.remove('show','pop'); },300);
-      },150);
-    }, 550);
-  },{passive:true});
-
-  el.addEventListener('touchmove', function(){
-    if(timer){ clearTimeout(timer); timer=null; }
-  },{passive:true});
 
   el.addEventListener('touchend', function(e){
-    if(timer){ clearTimeout(timer); timer=null; }
     if(!S.selMode) return;
-    var t = e.changedTouches[0];
-    S.selEnd = lineAt(el, t.clientX, t.clientY);
-    applyLineSelect();
-    updateSelBar();
     e.preventDefault();
+    var t = e.changedTouches[0];
+    var line = lineAt(t.clientY);
+    if(S.selStart === -1){
+      S.selStart = line;
+      showNotif('Baris '+(line+1)+' — tap baris akhir','info');
+    } else {
+      S.selEnd = line;
+      applyLineSelect();
+      updateSelBar();
+    }
+  });
+
+  el.addEventListener('click', function(e){
+    if(!S.selMode) return;
+    var line = lineAt(e.clientY);
+    if(S.selStart === -1){
+      S.selStart = line;
+      showNotif('Baris '+(line+1)+' — tap baris akhir','info');
+    } else {
+      S.selEnd = line;
+      applyLineSelect();
+      updateSelBar();
+    }
   });
 }
 
@@ -532,6 +547,28 @@ function updateSelBar(){
 function clearSelection(){
   S.selMode=false; S.selStart=-1; S.selEnd=-1;
   document.getElementById('sel-bar').classList.remove('show');
+  var btn=document.getElementById('btn-pilih');
+  if(btn){ btn.style.background=''; btn.style.color=''; btn.style.borderColor=''; }
+  inp().style.cursor='';
+}
+
+function copyAll(){
+  var content=inp().value;
+  if(!content){ showNotif('Tiada kandungan','err'); return; }
+  navigator.clipboard.writeText(content).then(function(){
+    showNotif('Semua kod disalin!','ok');
+  }).catch(function(){ showNotif('Gagal salin','err'); });
+}
+
+function pasteAll(){
+  navigator.clipboard.readText().then(function(text){
+    if(!text){ showNotif('Clipboard kosong','err'); return; }
+    if(!confirm('Tampal akan GANTIKAN semua kod semasa. Teruskan?')) return;
+    pushUndo();
+    inp().value=text;
+    updateAll(); saveToStorage();
+    showNotif('Kod ditampal!','ok');
+  }).catch(function(){ showNotif('Benarkan akses clipboard dahulu','err'); });
 }
 
 function getSelText(){
@@ -754,7 +791,6 @@ function _liveHighlight(){
   status.style.color = 'var(--green)';
   status.textContent = '✓ ' + found.length + ' kejadian dijumpai';
 
-  // scroll dan highlight baris pertama yang jumpa
   var r = found[0];
   var el = inp();
   var lines = el.value.split('\n');
@@ -766,8 +802,16 @@ function _liveHighlight(){
 
   el.scrollTop = Math.max(0, (r.startLine - 3) * 22);
   syncScroll();
+
+  // simpan selection, highlight editor tanpa hilangkan focus dari panel
+  el.blur();
   el.focus();
   el.setSelectionRange(pos, endPos);
+
+  // kembalikan focus ke kotak carian selepas highlight
+  setTimeout(function(){
+    document.getElementById('replace-find').focus();
+  }, 50);
 }
 
 function previewReplace(){
