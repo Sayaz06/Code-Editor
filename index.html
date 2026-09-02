@@ -428,7 +428,7 @@ function setupEditor(){
 function syncScroll(){
   var el = inp();
   var lnInner = document.getElementById('line-nums-inner');
-  lnInner.style.top = -el.scrollTop + 'px';
+  lnInner.style.top = (12 - el.scrollTop) + 'px';
 }
 
 function updateAll(){
@@ -442,7 +442,7 @@ function updateLineNums(){
   var el = inp();
   var lines = (el.value||'').split('\n');
   var lnInner = document.getElementById('line-nums-inner');
-  var html = '<div style="height:12px"></div>';
+  var html = '';
   for(var i=1;i<=Math.max(lines.length,1);i++){
     html += '<div>'+i+'</div>';
   }
