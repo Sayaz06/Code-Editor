@@ -731,8 +731,10 @@ function jumpToResult(idx){
   for(var j=r.line;j<r.line+r.span;j++) endPos+=lines[j].length+1;
   el.focus();
   el.setSelectionRange(pos,Math.min(endPos-1,el.value.length));
-  el.scrollTop=Math.max(0,(r.line-3)*22);
-  afterScroll();
+  setTimeout(function(){
+    el.scrollTop=Math.max(0,(r.line-3)*22);
+    afterScroll();
+  },30);
   S.searchIdx=idx;
 }
 
@@ -824,8 +826,10 @@ function jumpToFound(){
   endPos = Math.min(endPos - 1, el.value.length);
   el.focus();
   el.setSelectionRange(pos, endPos);
-  el.scrollTop = Math.max(0, (r.startLine - 3) * 22);
-  afterScroll();
+  setTimeout(function(){
+    el.scrollTop = Math.max(0, (r.startLine - 3) * 22);
+    afterScroll();
+  },30);
   showNotif('Baris '+(r.startLine+1)+' — '+(r.endLine+1),'info');
 }
 
@@ -876,8 +880,10 @@ function doReplace(){
     endPos=Math.min(endPos-1,el.value.length);
     el.focus();
     el.setSelectionRange(pos,endPos);
-    el.scrollTop=Math.max(0,(firstNewStart-3)*22);
-    afterScroll();
+    setTimeout(function(){
+      el.scrollTop=Math.max(0,(firstNewStart-3)*22);
+      afterScroll();
+    },30);
 
     // tunjuk bar unhighlight
     document.getElementById('replace-done-msg').textContent='✓ '+found.length+' gantian berjaya — Baris '+(firstNewStart+1);
@@ -945,8 +951,10 @@ function jumpToLine(){
   for(var i=0;i<n;i++) pos+=lines[i].length+1;
   el.focus();
   el.setSelectionRange(pos,pos+lines[n].length);
-  el.scrollTop=Math.max(0,(n-3)*22);
-  afterScroll();
+  setTimeout(function(){
+    el.scrollTop=Math.max(0,(n-3)*22);
+    afterScroll();
+  },30);
   showNotif('Baris '+(n+1),'info');
 }
 
