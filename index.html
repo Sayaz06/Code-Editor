@@ -58,7 +58,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
 /* LINE NUMBERS */
 #line-nums{width:48px;overflow:hidden;background:var(--surface3);border-right:1px solid var(--border);flex-shrink:0;user-select:none;-webkit-user-select:none;position:relative}
-#line-nums-inner{position:absolute;top:0;left:0;right:0;padding:0;font-family:var(--font-mono);font-size:13px;color:var(--text2);text-align:right}
+#line-nums-inner{position:absolute;top:0;left:0;right:0;padding:12px 0 0 0;font-family:var(--font-mono);font-size:13px;color:var(--text2);text-align:right}
 #line-nums-inner div{height:var(--line-h);line-height:var(--line-h);font-size:12px;padding-right:8px}
 
 /* CODE AREA */
@@ -431,7 +431,7 @@ function setupEditor(){
 function syncScroll(){
   var el = inp();
   var lnInner = document.getElementById('line-nums-inner');
-  lnInner.style.top = (12 - el.scrollTop) + 'px';
+  lnInner.style.top = -el.scrollTop + 'px';
 }
 
 function afterScroll(){
@@ -453,7 +453,7 @@ function updateLineNums(){
   var el = inp();
   var lines = (el.value||'').split('\n');
   var lnInner = document.getElementById('line-nums-inner');
-  var html = '<div style="height:12px;line-height:0;font-size:0"> </div>';
+  var html = '';
   for(var i=1;i<=Math.max(lines.length,1);i++){
     html += '<div>'+i+'</div>';
   }
