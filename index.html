@@ -428,7 +428,7 @@ function setupEditor(){
 function syncScroll(){
   var el = inp();
   var lnInner = document.getElementById('line-nums-inner');
-  lnInner.style.top = (12 - el.scrollTop) + 'px';
+  lnInner.style.top = -el.scrollTop + 'px';
 }
 
 function updateAll(){
@@ -442,7 +442,7 @@ function updateLineNums(){
   var el = inp();
   var lines = (el.value||'').split('\n');
   var lnInner = document.getElementById('line-nums-inner');
-  var html = '';
+  var html = '<div style="height:12px"></div>';
   for(var i=1;i<=Math.max(lines.length,1);i++){
     html += '<div>'+i+'</div>';
   }
@@ -936,9 +936,12 @@ function jumpToLine(){
   n=Math.max(0,Math.min(n,lines.length-1));
   var pos=0;
   for(var i=0;i<n;i++) pos+=lines[i].length+1;
+  el.focus();
   el.setSelectionRange(pos,pos+lines[n].length);
-  el.scrollTop=Math.max(0,(n-3)*22);
-  syncScroll(); el.focus();
+  setTimeout(function(){
+    el.scrollTop=Math.max(0,(n-3)*22);
+    syncScroll();
+  },50);
   showNotif('Baris '+(n+1),'info');
 }
 
