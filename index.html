@@ -166,6 +166,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <div id="toolbar">
     <button class="tool-btn" onclick="openPanel('search-panel')">🔍 Cari</button>
     <button class="tool-btn" onclick="openPanel('replace-panel')">🔄 Ganti</button>
+    <button class="tool-btn" id="btn-pilih" onclick="toggleSelMode()">☰ Pilih</button>
     <button class="tool-btn" onclick="doUndo()">↩ Undo</button>
     <button class="tool-btn" onclick="doRedo()">↪ Redo</button>
     <button class="tool-btn" onclick="jumpToLine()">≡ Baris</button>
@@ -457,54 +458,69 @@ function checkEmpty(){
 }
 
 // ═══════════════════════════════════
-// LONG PRESS LINE SELECT
+// MOD PILIH BARIS
 // ═══════════════════════════════════
+function lineAt(cy){
+  var el = inp();
+  var rect = el.getBoundingClientRect();
+  var relY = cy - rect.top + el.scrollTop;
+  var n = Math.floor(relY / 22);
+  var total = el.value.split('\n').length;
+  return Math.max(0, Math.min(n, total-1));
+}
+
+function toggleSelMode(){
+  S.selMode = !S.selMode;
+  S.selStart = -1;
+  S.selEnd = -1;
+  var btn = document.getElementById('btn-pilih');
+  if(S.selMode){
+    btn.style.background = 'var(--accent)';
+    btn.style.color = '#0f0f1a';
+    btn.style.borderColor = 'var(--accent)';
+    inp().style.cursor = 'crosshair';
+    showNotif('Mod Pilih ON — tap baris mula','info');
+  } else {
+    btn.style.background = '';
+    btn.style.color = '';
+    btn.style.borderColor = '';
+    inp().style.cursor = '';
+    document.getElementById('sel-bar').classList.remove('show');
+    showNotif('Mod Pilih OFF','info');
+  }
+}
+
 function setupLongPress(){
   var el = inp();
-  var ring = document.getElementById('lp-ring');
-  var timer = null;
-  var startLine = 0;
-
-  function lineAt(ta, cx, cy){
-    var rect = ta.getBoundingClientRect();
-    var relY = cy - rect.top + ta.scrollTop;
-    var lineH = 22;
-    var n = Math.floor(relY / lineH);
-    var total = ta.value.split('\n').length;
-    return Math.max(0, Math.min(n, total-1));
-  }
-
-  el.addEventListener('touchstart', function(e){
-    var t = e.touches[0];
-    startLine = lineAt(el, t.clientX, t.clientY);
-    ring.style.left = t.clientX+'px';
-    ring.style.top = t.clientY+'px';
-    timer = setTimeout(function(){
-      S.selMode = true;
-      S.selStart = startLine;
-      S.selEnd = startLine;
-      ring.classList.add('show');
-      if(navigator.vibrate) navigator.vibrate(25);
-      showNotif('Scroll ke baris akhir, tekan sekali','info');
-      setTimeout(function(){
-        ring.classList.add('pop');
-        setTimeout(function(){ ring.classList.remove('show','pop'); },300);
-      },150);
-    }, 550);
-  },{passive:true});
-
-  el.addEventListener('touchmove', function(){
-    if(timer){ clearTimeout(timer); timer=null; }
-  },{passive:true});
 
   el.addEventListener('touchend', function(e){
-    if(timer){ clearTimeout(timer); timer=null; }
     if(!S.selMode) return;
-    var t = e.changedTouches[0];
-    S.selEnd = lineAt(el, t.clientX, t.clientY);
-    applyLineSelect();
-    updateSelBar();
     e.preventDefault();
+    var t = e.changedTouches[0];
+    var line = lineAt(t.clientY);
+
+    if(S.selStart === -1){
+      S.selStart = line;
+      showNotif('Baris '+(line+1)+' dipilih — tap baris akhir','info');
+    } else {
+      S.selEnd = line;
+      applyLineSelect();
+      updateSelBar();
+    }
+  });
+
+  el.addEventListener('click', function(e){
+    if(!S.selMode) return;
+    var line = lineAt(e.clientY);
+
+    if(S.selStart === -1){
+      S.selStart = line;
+      showNotif('Baris '+(line+1)+' dipilih — tap baris akhir','info');
+    } else {
+      S.selEnd = line;
+      applyLineSelect();
+      updateSelBar();
+    }
   });
 }
 
@@ -532,6 +548,9 @@ function updateSelBar(){
 function clearSelection(){
   S.selMode=false; S.selStart=-1; S.selEnd=-1;
   document.getElementById('sel-bar').classList.remove('show');
+  var btn=document.getElementById('btn-pilih');
+  btn.style.background=''; btn.style.color=''; btn.style.borderColor='';
+  inp().style.cursor='';
 }
 
 function getSelText(){
