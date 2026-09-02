@@ -52,8 +52,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #line-nums-inner{padding:12px 0;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);color:var(--text2);text-align:right;padding-right:8px}
 #code-area{flex:1;overflow:auto;-webkit-overflow-scrolling:touch;position:relative}
 #code-scroll-inner{min-height:100%;position:relative;display:inline-block;min-width:100%}
-#code-highlight{padding:12px 40px 12px 10px;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);white-space:pre;pointer-events:none;color:var(--text);z-index:0;position:relative}
-#code-input{position:absolute;top:0;left:0;width:100%;height:100%;padding:12px 40px 12px 10px;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);background:transparent;border:none;outline:none;color:transparent;caret-color:var(--accent);resize:none;z-index:1;white-space:pre;overflow:hidden;-webkit-overflow-scrolling:touch}
+#code-input{width:100%;height:100%;min-height:400px;padding:12px 10px;font-family:var(--font-mono);font-size:13px;line-height:var(--line-h);background:transparent;border:none;outline:none;color:var(--text);caret-color:var(--accent);resize:none;white-space:pre;overflow:visible;display:block;}
   
 /* SELECTION HIGHLIGHT */
 .sel-highlight{background:rgba(76,201,240,0.2);border-radius:2px}
@@ -218,7 +217,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div id="line-nums"><div id="line-nums-inner">1</div></div>
       <div id="code-area">
         <div id="code-scroll-inner">
-          <div id="code-highlight"></div>
           <textarea id="code-input" spellcheck="false" autocorrect="off" autocapitalize="off" autocomplete="off" placeholder="Upload fail HTML atau taip kod di sini..."></textarea>
           <div id="long-press-ring"></div>
         </div>
@@ -488,54 +486,26 @@ function setupEditor() {
 }
 
 function syncScroll() {
-  var area = document.getElementById('code-area');
-  var hl = document.getElementById('code-highlight');
+  var inp = document.getElementById('code-input');
   var lnInner = document.getElementById('line-nums-inner');
-  hl.scrollTop = area.scrollTop;
-  lnInner.style.transform = 'translateY(-' + area.scrollTop + 'px)';
+  lnInner.style.transform = 'translateY(-' + inp.scrollTop + 'px)';
 }
 
 function renderHighlight() {
-  var inp = document.getElementById('code-input');
-  var hl = document.getElementById('code-highlight');
-  var txt = inp.value || '';
-  // Simple HTML syntax highlighting
-  var html = txt
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    // HTML tags
-    .replace(/(&lt;\/?)([\w\-:]+)([^&]*?)(\/?&gt;)/g, function(m, open, tag, attr, close) {
-      var attrH = attr.replace(/([\w\-]+)(=)/g, '<span style="color:#ffd166">$1</span><span style="color:#94a3b8">$2</span>')
-                      .replace(/("([^"]*)")/g, '<span style="color:#06d6a0">"$2"</span>')
-                      .replace(/('([^']*)')/g, "<span style='color:#06d6a0'>'$2'</span>");
-      return '<span style="color:#94a3b8">' + open + '</span><span style="color:#4cc9f0;font-weight:500">' + tag + '</span>' + attrH + '<span style="color:#94a3b8">' + close + '</span>';
-    })
-    // JS strings
-    .replace(/(["'`])(?:(?!\1)[^\\]|\\.)*?\1/g, function(m) {
-      return '<span style="color:#06d6a0">' + m + '</span>';
-    })
-    // Comments
-    .replace(/(\/\/[^\n]*)/g, '<span style="color:#64748b;font-style:italic">$1</span>')
-    .replace(/(\/\*[\s\S]*?\*\/)/g, '<span style="color:#64748b;font-style:italic">$1</span>')
-    // Keywords
-    .replace(/\b(function|var|let|const|if|else|return|for|while|do|switch|case|break|class|new|this|typeof|null|undefined|true|false|import|export|from|async|await)\b/g, '<span style="color:#a78bfa">$1</span>');
-  
-  hl.innerHTML = html;
-  // Maintain scroll height
-  document.getElementById('code-scroll-inner').style.minHeight = (inp.scrollHeight) + 'px';
+  updateLineNums();
 }
 
 function updateLineNums() {
   var inp = document.getElementById('code-input');
   var lines = (inp.value || '').split('\n');
   var lnInner = document.getElementById('line-nums-inner');
+  var lineH = 'var(--line-h)';
   var html = '';
   for (var i = 1; i <= Math.max(lines.length, 1); i++) {
-    html += i + '\n';
+    html += '<div style="height:var(--line-h);display:flex;align-items:center;justify-content:flex-end;padding-right:8px">' + i + '</div>';
   }
-  lnInner.textContent = html;
-  lnInner.style.lineHeight = 'var(--line-h)';
+  lnInner.innerHTML = html;
+  lnInner.style.lineHeight = 'normal';
 }
 
 function updateCursor() {
@@ -759,8 +729,8 @@ function downloadFile() {
 // SEARCH
 // ═══════════════════════════════════════
 var searchTimeout = null;
-function normalizeForSearch(str) {
-  return str.split('\n').map(function(l){ return l.trim().replace(/\s+/g,' '); }).join('\n').replace(/\n+/g,'\n').trim();
+function normalizeWS(s) {
+  return s.trim().replace(/\s+/g, ' ');
 }
 
 function doSearch() {
@@ -779,37 +749,34 @@ function _doSearch() {
   if (!query) { container.innerHTML = ''; state.searchResults = []; return; }
 
   try {
+    var contentLines = content.split('\n');
+
     if (useRegex) {
       var flags = caseSensitive ? 'g' : 'gi';
       var regex = new RegExp(query, flags);
-      var lines = content.split('\n');
-      lines.forEach(function(line, idx) {
+      contentLines.forEach(function(line, idx) {
         regex.lastIndex = 0;
-        if (regex.test(line)) results.push({line: idx, text: line, multi: false});
+        if (regex.test(line)) results.push({line: idx, text: line, span: 1});
       });
     } else {
-      var normQuery = normalizeForSearch(query);
-      var queryLines = normQuery.split('\n');
-      var contentLines = content.split('\n');
-      var isCaseSensitive = caseSensitive;
+      var queryLines = query.split('\n').map(normalizeWS).filter(function(l){ return l.length > 0; });
+      var isSingle = queryLines.length === 1;
 
-      if (queryLines.length === 1) {
+      if (isSingle) {
+        var q = caseSensitive ? queryLines[0] : queryLines[0].toLowerCase();
         contentLines.forEach(function(line, idx) {
-          var normLine = line.trim().replace(/\s+/g,' ');
-          var a = isCaseSensitive ? normLine : normLine.toLowerCase();
-          var b = isCaseSensitive ? normQuery : normQuery.toLowerCase();
-          if (a.includes(b)) results.push({line: idx, text: line, multi: false});
+          var norm = caseSensitive ? normalizeWS(line) : normalizeWS(line).toLowerCase();
+          if (norm.includes(q)) results.push({line: idx, text: line, span: 1});
         });
       } else {
         for (var i = 0; i <= contentLines.length - queryLines.length; i++) {
           var match = true;
           for (var j = 0; j < queryLines.length; j++) {
-            var normContent = contentLines[i+j].trim().replace(/\s+/g,' ');
-            var a = isCaseSensitive ? normContent : normContent.toLowerCase();
-            var b = isCaseSensitive ? queryLines[j] : queryLines[j].toLowerCase();
-            if (!a.includes(b)) { match = false; break; }
+            var norm = caseSensitive ? normalizeWS(contentLines[i+j]) : normalizeWS(contentLines[i+j]).toLowerCase();
+            var q2 = caseSensitive ? queryLines[j] : queryLines[j].toLowerCase();
+            if (!norm.includes(q2)) { match = false; break; }
           }
-          if (match) results.push({line: i, text: contentLines.slice(i, i+queryLines.length).join('\n'), multi: true, span: queryLines.length});
+          if (match) results.push({line: i, text: contentLines.slice(i, i+queryLines.length).join('\n'), span: queryLines.length});
         }
       }
     }
@@ -819,16 +786,17 @@ function _doSearch() {
 
     var html = '<div class="result-count">' + results.length + ' hasil ditemui</div>';
     results.forEach(function(r, i) {
-      var preview = r.text.length > 120 ? r.text.substring(0,120)+'...' : r.text;
-      preview = preview.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-      html += '<div class="result-item" onclick="jumpToResult('+i+')"><div class="result-line">Baris '+(r.line+1)+(r.multi?' — '+(r.line+r.span):'')+'</div><div class="result-text">'+preview+'</div></div>';
+      var preview = r.text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      if (preview.length > 120) preview = preview.substring(0, 120) + '...';
+      var label = r.span > 1 ? 'Baris ' + (r.line+1) + ' — ' + (r.line+r.span) : 'Baris ' + (r.line+1);
+      html += '<div class="result-item" onclick="jumpToResult('+i+')"><div class="result-line">'+label+'</div><div class="result-text">'+preview+'</div></div>';
     });
     container.innerHTML = html || '<div style="color:var(--text2);font-size:12px">Tiada hasil</div>';
   } catch(e) {
-    container.innerHTML = '<div style="color:var(--red);font-size:12px">Regex tidak sah</div>';
+    container.innerHTML = '<div style="color:var(--red);font-size:12px">Regex tidak sah: ' + e.message + '</div>';
   }
 }
-
+  
 function jumpToResult(idx) {
   var r = state.searchResults[idx];
   if (!r) return;
