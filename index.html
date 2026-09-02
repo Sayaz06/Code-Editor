@@ -826,6 +826,40 @@ function searchPrev() {
 // ═══════════════════════════════════════
 // REPLACE
 // ═══════════════════════════════════════
+function flexibleFind(content, findTxt) {
+  var contentLines = content.split('\n');
+  var queryLines = findTxt.split('\n').map(normalizeWS).filter(function(l){ return l.length > 0; });
+  var results = [];
+
+  if (queryLines.length === 1) {
+    var q = queryLines[0].toLowerCase();
+    contentLines.forEach(function(line, idx) {
+      var norm = normalizeWS(line).toLowerCase();
+      if (norm.includes(q)) {
+        var col = norm.indexOf(q);
+        results.push({startLine: idx, endLine: idx, origLines: [line]});
+      }
+    });
+  } else {
+    for (var i = 0; i <= contentLines.length - queryLines.length; i++) {
+      var match = true;
+      for (var j = 0; j < queryLines.length; j++) {
+        var norm = normalizeWS(contentLines[i+j]).toLowerCase();
+        var q2 = queryLines[j].toLowerCase();
+        if (!norm.includes(q2)) { match = false; break; }
+      }
+      if (match) {
+        results.push({
+          startLine: i,
+          endLine: i + queryLines.length - 1,
+          origLines: contentLines.slice(i, i + queryLines.length)
+        });
+      }
+    }
+  }
+  return results;
+}
+
 function previewReplace() {
   var findTxt = document.getElementById('replace-find').value;
   var withTxt = document.getElementById('replace-with').value;
@@ -833,15 +867,13 @@ function previewReplace() {
   var div = document.getElementById('replace-preview');
 
   if (!findTxt) { showNotif('Isi teks untuk dicari', 'err'); return; }
-  if (!content.includes(findTxt)) { showNotif('Teks tidak dijumpai dalam fail', 'err'); div.style.display = 'none'; return; }
 
-  var count = 0;
-  var pos = 0;
-  while ((pos = content.indexOf(findTxt, pos)) !== -1) { count++; pos += findTxt.length; }
+  var found = flexibleFind(content, findTxt);
+  if (!found.length) { showNotif('Teks tidak dijumpai dalam fail', 'err'); div.style.display = 'none'; return; }
 
-  document.getElementById('preview-old').textContent = findTxt;
+  document.getElementById('preview-old').textContent = found[0].origLines.join('\n');
   document.getElementById('preview-new').textContent = withTxt;
-  document.getElementById('preview-count').textContent = count + ' kejadian akan diganti';
+  document.getElementById('preview-count').textContent = found.length + ' kejadian akan diganti';
   div.style.display = 'block';
 }
 
@@ -852,29 +884,33 @@ function doReplace() {
   var content = inp.value;
 
   if (!findTxt) { showNotif('Isi teks untuk dicari', 'err'); return; }
-  if (!content.includes(findTxt)) { showNotif('Teks tidak dijumpai!', 'err'); return; }
+
+  var found = flexibleFind(content, findTxt);
+  if (!found.length) { showNotif('Teks tidak dijumpai!', 'err'); return; }
 
   saveAutoBackup();
   pushUndo();
 
-  var count = 0;
-  var newContent = '';
-  var pos = 0;
-  var idx;
-  while ((idx = content.indexOf(findTxt, pos)) !== -1) {
-    newContent += content.substring(pos, idx) + withTxt;
-    pos = idx + findTxt.length;
-    count++;
-  }
-  newContent += content.substring(pos);
+  var contentLines = content.split('\n');
+  var offset = 0;
+  found.forEach(function(r) {
+    var startLine = r.startLine - offset;
+    var endLine = r.endLine - offset;
+    var linesBefore = contentLines.slice(0, startLine);
+    var linesAfter = contentLines.slice(endLine + 1);
+    var replacement = withTxt.split('\n');
+    contentLines = linesBefore.concat(replacement).concat(linesAfter);
+    offset += (r.endLine - r.startLine + 1) - replacement.length;
+  });
 
+  var newContent = contentLines.join('\n');
   inp.value = newContent;
   state.content = newContent;
   renderHighlight();
   updateLineNums();
   saveToStorage();
   closeAllPanels();
-  showNotif(count + ' gantian berjaya!', 'ok');
+  showNotif(found.length + ' gantian berjaya!', 'ok');
 }
 
 // ═══════════════════════════════════════
