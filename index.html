@@ -45,6 +45,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 #toolbar-gutter{width:48px;flex-shrink:0;border-right:1px solid var(--border)}
 #toolbar{display:flex;align-items:center;gap:6px;padding:6px 12px;flex:1;overflow-x:auto}
 #toolbar::-webkit-scrollbar{display:none}
+#drop-zone{position:fixed;bottom:40px;left:50%;transform:translateX(-50%);z-index:150;opacity:0;pointer-events:none;transition:opacity 0.3s}
+#drop-zone.show{opacity:1;pointer-events:all}
+#drop-zone-inner{background:var(--accent2);color:#fff;padding:14px 28px;border-radius:12px;font-size:14px;font-weight:600;border:2px dashed rgba(255,255,255,0.4);white-space:nowrap}
+#drop-zone.drag-over #drop-zone-inner{background:var(--green);color:#0f0f1a}
 .tool-btn{display:flex;align-items:center;gap:4px;padding:6px 10px;border-radius:6px;border:1px solid var(--border);background:var(--surface);color:var(--text2);cursor:pointer;font-size:12px;white-space:nowrap;flex-shrink:0}
 .tool-btn:active{background:var(--accent);color:#0f0f1a;border-color:var(--accent)}
 
@@ -180,6 +184,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="tool-btn" onclick="pasteAll()">📥 Tampal Semua</button>
     <button class="tool-btn" onclick="openPanel('info-panel')">ℹ Panduan</button>
   </div></div>
+
+  <!-- DROP ZONE -->
+  <div id="drop-zone">
+    <div id="drop-zone-inner">⬇ Seret fail ke sini untuk buka</div>
+  </div>
 
   <!-- SELECTION BAR -->
   <div id="sel-bar">
@@ -364,6 +373,7 @@ var KEY_BACKUP = 'kodedit_v2_backup';
   loadFromStorage();
   setupEditor();
   setupLongPress();
+  setupDragDrop();
 })();
 
 function inp(){ return document.getElementById('code-input'); }
@@ -631,6 +641,56 @@ function openReplaceFromSel(){
 // ═══════════════════════════════════
 function triggerUpload(){ document.getElementById('file-input').click(); }
 
+function setupDragDrop(){
+  var wrap = document.getElementById('editor-wrap');
+  var dz = document.getElementById('drop-zone');
+
+  // drag ke seluruh editor
+  wrap.addEventListener('dragover', function(e){
+    e.preventDefault();
+    dz.classList.add('show','drag-over');
+  });
+  wrap.addEventListener('dragleave', function(e){
+    if(!wrap.contains(e.relatedTarget)) dz.classList.remove('show','drag-over');
+  });
+  wrap.addEventListener('drop', function(e){
+    e.preventDefault();
+    dz.classList.remove('show','drag-over');
+    var file = e.dataTransfer.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      pushUndo();
+      S.fileName = file.name;
+      inp().value = ev.target.result;
+      updateAll(); saveToStorage(); saveRecent(file.name, ev.target.result);
+      showNotif('Dibuka: '+file.name,'ok');
+    };
+    reader.readAsText(file);
+  });
+
+  // drag ke drop-zone juga
+  dz.addEventListener('dragover', function(e){
+    e.preventDefault();
+    dz.classList.add('drag-over');
+  });
+  dz.addEventListener('drop', function(e){
+    e.preventDefault();
+    dz.classList.remove('show','drag-over');
+    var file = e.dataTransfer.files[0];
+    if(!file) return;
+    var reader = new FileReader();
+    reader.onload = function(ev){
+      pushUndo();
+      S.fileName = file.name;
+      inp().value = ev.target.result;
+      updateAll(); saveToStorage(); saveRecent(file.name, ev.target.result);
+      showNotif('Dibuka: '+file.name,'ok');
+    };
+    reader.readAsText(file);
+  });
+}
+
 function handleFileUpload(e){
   var file=e.target.files[0]; if(!file) return;
   var reader=new FileReader();
@@ -654,8 +714,19 @@ function downloadFile(){
   var a=document.createElement('a');
   a.href=url; a.download=name;
   document.body.appendChild(a); a.click();
-  document.body.removeChild(a); URL.revokeObjectURL(url);
-  showNotif('Dimuat turun: '+name,'ok');
+  document.body.removeChild(a);
+  setTimeout(function(){
+    URL.revokeObjectURL(url);
+    // buka semula fail yang baru didownload
+    showNotif('Dimuat turun — seret fail ke sini untuk buka semula','ok');
+    showDropZone();
+  }, 1000);
+}
+
+function showDropZone(){
+  var dz = document.getElementById('drop-zone');
+  dz.classList.add('show');
+  setTimeout(function(){ dz.classList.remove('show'); }, 8000);
 }
 
 // ═══════════════════════════════════
