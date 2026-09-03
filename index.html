@@ -171,7 +171,6 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="top-btn" onclick="openPanel('recent-panel')" title="Fail">📄</button>
     <button class="top-btn" onclick="triggerUpload()" title="Upload">⬆</button>
     <button class="top-btn accent" onclick="downloadFile()" title="Download">⬇</button>
-    <button class="top-btn" onclick="openDownloadFolder()" title="Buka Folder">📂</button>
   </div>
 
   <!-- TOOLBAR -->
@@ -299,10 +298,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="nav-tab" onclick="showTab('backup')">Auto-Backup</div>
   </div>
   <div class="panel-body" id="recent-body"></div>
-  <div class="panel-footer" style="flex-wrap:wrap;gap:6px">
+  <div class="panel-footer">
     <button class="btn" onclick="closeAllPanels()">Tutup</button>
     <button class="btn primary" onclick="triggerUpload();closeAllPanels()">Upload Baru</button>
-    <button class="btn" style="border-color:var(--amber);color:var(--amber)" onclick="closeAllPanels();setTimeout(function(){openPanel('path-panel')},100)">📂 Edit Path</button>
   </div>
 </div>
 
@@ -345,26 +343,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   </div>
 </div>
 
-<!-- PATH PANEL -->
-<div class="panel" id="path-panel">
-  <div class="panel-handle"></div>
-  <div class="panel-title">📂 Path Folder Download</div>
-  <div class="panel-body">
-    <div class="storage-note">Isi path folder download anda. Tekan butang 📂 selepas download untuk buka folder tu dalam tab baru — mudah drag fail ke Claude.</div>
-    <div class="field-label">Path folder (contoh: C:/Users/nama/Downloads)</div>
-    <input class="field" style="min-height:unset;height:44px;resize:none" id="path-input" placeholder="C:/Users/nama/Downloads" type="text">
-    <div style="font-size:12px;color:var(--text2);margin-top:8px">
-      Windows: <code style="color:var(--accent)">C:/Users/nama/Downloads</code><br>
-      Mac/Linux: <code style="color:var(--accent)">/Users/nama/Downloads</code>
-    </div>
-  </div>
-  <div class="panel-footer">
-    <button class="btn" onclick="closeAllPanels()">Batal</button>
-    <button class="btn primary" onclick="saveDownloadPath()">Simpan Path</button>
-  </div>
-</div>
-
-<input type="file" id="file-input"
+<input type="file" id="file-input" accept=".html,.htm,.js,.css,.txt,.json,.xml,.php,.py,.md" style="display:none" onchange="handleFileUpload(event)">
 <div id="notif"></div>
 
 <script>
@@ -726,31 +705,6 @@ function handleFileUpload(e){
   e.target.value='';
 }
 
-var KEY_PATH = 'kodedit_dl_path';
-
-function getDownloadPath(){
-  return localStorage.getItem(KEY_PATH) || '';
-}
-
-function openDownloadFolder(){
-  var path = getDownloadPath();
-  if(!path){
-    openPanel('path-panel');
-    return;
-  }
-  // pastikan format betul
-  var url = path.startsWith('file://') ? path : 'file:///' + path.replace(/\\/g,'/');
-  window.open(url, '_blank');
-}
-
-function saveDownloadPath(){
-  var val = document.getElementById('path-input').value.trim();
-  if(!val){ showNotif('Isi path dahulu','err'); return; }
-  localStorage.setItem(KEY_PATH, val);
-  showNotif('Path disimpan!','ok');
-  closeAllPanels();
-}
-
 function downloadFile(){
   var content=inp().value;
   if(!content){showNotif('Tiada kandungan','err');return;}
@@ -763,9 +717,10 @@ function downloadFile(){
   document.body.removeChild(a);
   setTimeout(function(){
     URL.revokeObjectURL(url);
-    showNotif('✓ Dimuat turun: '+name,'ok');
+    // buka semula fail yang baru didownload
+    showNotif('Dimuat turun — seret fail ke sini untuk buka semula','ok');
     showDropZone();
-  }, 500);
+  }, 1000);
 }
 
 function showDropZone(){
