@@ -171,6 +171,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="top-btn" onclick="openPanel('recent-panel')" title="Fail">📄</button>
     <button class="top-btn" onclick="triggerUpload()" title="Upload">⬆</button>
     <button class="top-btn accent" onclick="downloadFile()" title="Download">⬇</button>
+    <button class="top-btn" onclick="previewHTML()" title="Preview">👁</button>
   </div>
 
   <!-- TOOLBAR -->
@@ -703,6 +704,17 @@ function handleFileUpload(e){
   };
   reader.readAsText(file);
   e.target.value='';
+}
+
+function previewHTML(){
+  var content = inp().value;
+  if(!content){ showNotif('Tiada kandungan untuk preview','err'); return; }
+  var blob = new Blob([content], {type:'text/html;charset=utf-8'});
+  var url = URL.createObjectURL(blob);
+  var tab = window.open(url, '_blank');
+  if(!tab){ showNotif('Benarkan popup untuk preview','err'); return; }
+  setTimeout(function(){ URL.revokeObjectURL(url); }, 10000);
+  showNotif('Preview dibuka!','ok');
 }
 
 function downloadFile(){
