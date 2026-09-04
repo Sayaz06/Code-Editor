@@ -265,28 +265,43 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 <!-- REPLACE PANEL -->
 <div class="panel" id="replace-panel">
   <div class="panel-handle"></div>
-  <div class="panel-title">🔄 Cari & Ganti</div>
+  <div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
+    <div class="nav-tab active" id="rp-tab-single" onclick="rpShowTab('single')" style="flex:1">🔄 Ganti</div>
+    <div class="nav-tab" id="rp-tab-bulk" onclick="rpShowTab('bulk')" style="flex:1">⚡ Ganti Pukal</div>
+  </div>
   <div class="panel-body">
-    <div class="field-label">Cari kod ini (boleh multiline, space tidak ketat)</div>
-    <textarea class="field" id="replace-find" rows="4" placeholder="Tampal kod lama di sini..." oninput="liveHighlight()"></textarea>
-    <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
-      <div id="find-status" style="font-size:12px;flex:1;min-height:18px"></div>
-      <button class="tool-btn" onclick="jumpToFound()" style="padding:4px 10px;flex-shrink:0">↵ Pergi</button>
+    <div id="rp-single-view">
+      <div class="field-label">Cari kod ini (boleh multiline, space tidak ketat)</div>
+      <textarea class="field" id="replace-find" rows="4" placeholder="Tampal kod lama di sini..." oninput="liveHighlight()"></textarea>
+      <div style="display:flex;align-items:center;gap:8px;margin:6px 0">
+        <div id="find-status" style="font-size:12px;flex:1;min-height:18px"></div>
+        <button class="tool-btn" onclick="jumpToFound()" style="padding:4px 10px;flex-shrink:0">↵ Pergi</button>
+      </div>
+      <div class="field-label">Ganti dengan</div>
+      <textarea class="field" id="replace-with" rows="4" placeholder="Tampal kod baru di sini..."></textarea>
+      <div id="replace-preview" style="margin-top:10px;display:none">
+        <div class="compare-label old">— KOD LAMA</div>
+        <div class="compare-old" id="preview-old"></div>
+        <div class="compare-label new" style="margin-top:6px">+ KOD BARU</div>
+        <div class="compare-new" id="preview-new"></div>
+        <div style="font-size:12px;color:var(--text2);margin-top:6px" id="preview-count"></div>
+      </div>
     </div>
-    <div class="field-label">Ganti dengan</div>
-    <textarea class="field" id="replace-with" rows="4" placeholder="Tampal kod baru di sini..."></textarea>
-    <div id="replace-preview" style="margin-top:10px;display:none">
-      <div class="compare-label old">— KOD LAMA</div>
-      <div class="compare-old" id="preview-old"></div>
-      <div class="compare-label new" style="margin-top:6px">+ KOD BARU</div>
-      <div class="compare-new" id="preview-new"></div>
-      <div style="font-size:12px;color:var(--text2);margin-top:6px" id="preview-count"></div>
+    <div id="rp-bulk-view" style="display:none">
+      <div class="storage-note">Tampal output AI dalam format:<br><strong>Cari:</strong><br>[kod lama]<br><strong>Ganti:</strong><br>[kod baru]<br><br>Boleh ada banyak blok berturutan.</div>
+      <textarea class="field" id="bulk-input" rows="10" placeholder="Tampal semua blok Cari/Ganti di sini..."></textarea>
+      <div id="bulk-status" style="font-size:12px;margin-top:8px;min-height:18px;color:var(--text2)"></div>
     </div>
   </div>
-<div class="panel-footer">
+  <div class="panel-footer" id="rp-footer-single">
     <button class="btn" onclick="previewReplace()">Preview</button>
     <button class="btn success" onclick="doReplace()">Ganti Semua</button>
     <button class="btn" onclick="clearReplace()">🗑 Clear</button>
+    <button class="btn danger" onclick="closeAllPanels()">Batal</button>
+  </div>
+  <div class="panel-footer" id="rp-footer-bulk" style="display:none">
+    <button class="btn" onclick="clearBulk()">🗑 Clear</button>
+    <button class="btn success" onclick="doBulkReplace()">⚡ Ganti Pukal</button>
     <button class="btn danger" onclick="closeAllPanels()">Batal</button>
   </div>
 </div>
@@ -1151,12 +1166,81 @@ function doReplace(){
   document.getElementById('overlay').classList.remove('show');
   showNotif(found.length+' gantian berjaya!','ok');
 }
+function rpShowTab(tab){
+  var isSingle=tab==='single';
+  document.getElementById('rp-single-view').style.display=isSingle?'block':'none';
+  document.getElementById('rp-bulk-view').style.display=isSingle?'none':'block';
+  document.getElementById('rp-footer-single').style.display=isSingle?'flex':'none';
+  document.getElementById('rp-footer-bulk').style.display=isSingle?'none':'flex';
+  document.getElementById('rp-tab-single').classList.toggle('active',isSingle);
+  document.getElementById('rp-tab-bulk').classList.toggle('active',!isSingle);
+}
+
 function clearReplace(){
   document.getElementById('replace-find').value='';
   document.getElementById('replace-with').value='';
   document.getElementById('replace-preview').style.display='none';
   document.getElementById('find-status').textContent='';
   _foundResults=[];
+}
+
+function clearBulk(){
+  document.getElementById('bulk-input').value='';
+  document.getElementById('bulk-status').textContent='';
+}
+
+function parseBulkInput(raw){
+  var pairs=[];
+  var lines=raw.split('\n');
+  var mode=null,findLines=[],withLines=[];
+  for(var i=0;i<lines.length;i++){
+    var trimmed=lines[i].trim().toLowerCase();
+    if(trimmed==='cari:'){
+      if(mode==='ganti'&&findLines.length) pairs.push({find:findLines.join('\n'),with:withLines.join('\n')});
+      mode='cari'; findLines=[]; withLines=[];
+    } else if(trimmed==='ganti:'){
+      mode='ganti'; withLines=[];
+    } else {
+      if(mode==='cari') findLines.push(lines[i]);
+      else if(mode==='ganti') withLines.push(lines[i]);
+    }
+  }
+  if(mode==='ganti'&&findLines.length) pairs.push({find:findLines.join('\n'),with:withLines.join('\n')});
+  return pairs;
+}
+
+function doBulkReplace(){
+  var raw=document.getElementById('bulk-input').value;
+  var status=document.getElementById('bulk-status');
+  if(!raw.trim()){showNotif('Tampal blok Cari/Ganti dahulu','err');return;}
+  var pairs=parseBulkInput(raw);
+  if(!pairs.length){
+    status.style.color='var(--red)';
+    status.textContent='✕ Tiada blok Cari/Ganti dijumpai — pastikan format betul';
+    return;
+  }
+  saveBackup(); pushUndo();
+  var content=inp().value;
+  var totalGanti=0,tidakJumpa=[];
+  pairs.forEach(function(p){
+    var found=flexFind(content,p.find);
+    if(!found.length){tidakJumpa.push(p.find.substring(0,40).trim());return;}
+    var cLines=content.split('\n'),offset=0;
+    found.forEach(function(r){
+      var s=r.startLine-offset,e=r.endLine-offset,rep=p.with.split('\n');
+      cLines=cLines.slice(0,s).concat(rep).concat(cLines.slice(e+1));
+      offset+=(r.endLine-r.startLine+1)-rep.length;
+    });
+    content=cLines.join('\n');
+    totalGanti+=found.length;
+  });
+  inp().value=content;
+  updateAll(); saveToStorage();
+  var msg='✓ '+totalGanti+' gantian dari '+pairs.length+' blok berjaya';
+  if(tidakJumpa.length) msg+=' | ✕ '+tidakJumpa.length+' tidak jumpa';
+  status.style.color=tidakJumpa.length?'var(--amber)':'var(--green)';
+  status.textContent=msg;
+  showNotif(totalGanti+' gantian berjaya!','ok');
 }
 
 function unhighlightDone(){
