@@ -801,6 +801,8 @@ function ghSetOrigBlock(blocked){
     ds.style.color=blocked?'var(--amber)':'var(--green)';
     ds.textContent=blocked?'⏳ Menunggu Pages build... tekan 🔍 untuk check':'';
   }
+  // release global lock kalau unblock
+  if(!blocked) ghSetGlobalLock(false);
   // simpan state dalam Firebase
   if(currentUser){
     db.collection('users').doc(currentUser.uid).collection('settings').doc('deployState').set({
@@ -840,7 +842,7 @@ function ghCheckOrigStatus(){
 
 function ghDeployOriginal(){
   if(!S.filePath||!S.fileRepo){showNotif('Tiada fail GitHub dibuka','err');return;}
-  if(S.origDeployBlocked){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
+  if(_ghGlobalLock||S.origDeployBlocked){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
   var token=ghGetToken();
   if(!token){showNotif('Simpan API Key dahulu','err');return;}
   var content=inp().value;
@@ -865,18 +867,21 @@ function ghDeployOriginal(){
         status.style.color='var(--green)';
         status.textContent='✓ Deploy berjaya: '+S.filePath;
         showNotif('🚀 Deploy berjaya!','ok');
+        ghSetGlobalLock(true);
         ghSetOrigBlock(true);
         setTimeout(function(){ ghCheckOrigStatus(); }, 30000);
       } else {
         status.style.color='var(--red)';
         status.textContent='✕ '+(data.message||'Gagal');
         showNotif('Deploy gagal','err');
+        ghSetGlobalLock(false);
         ghSetOrigBlock(false);
       }
     })
     .catch(function(e){
       status.style.color='var(--red)'; status.textContent='✕ '+e.message;
       showNotif('Deploy gagal','err');
+      ghSetGlobalLock(false);
       ghSetOrigBlock(false);
     });
 }
@@ -1007,6 +1012,25 @@ function ghCheckStatus(idx){
     });
 }
 
+var _ghGlobalLock=false;
+
+function ghSetGlobalLock(locked){
+  _ghGlobalLock=locked;
+  // block semua button deploy dalam senarai
+  document.querySelectorAll('#gh-apps-list .btn.success').forEach(function(btn){
+    btn.disabled=locked;
+    btn.style.opacity=locked?'0.5':'1';
+    btn.style.cursor=locked?'not-allowed':'pointer';
+  });
+  // block button deploy original
+  var origBtn=document.getElementById('btn-deploy-orig');
+  if(origBtn){
+    origBtn.disabled=locked;
+    origBtn.style.opacity=locked?'0.5':'1';
+    origBtn.style.cursor=locked?'not-allowed':'pointer';
+  }
+}
+
 function ghSetDeployBlock(idx, blocked){
   if(!currentUser) return;
   var configs=ghGetConfigs();
@@ -1014,13 +1038,14 @@ function ghSetDeployBlock(idx, blocked){
   configs[idx].deployBlocked=blocked;
   _ghConfigs=configs;
   ghSaveToFirebase();
-  // update button UI
   var btn=document.querySelector('#gh-item-'+idx+' .btn.success');
   if(btn){
     btn.disabled=blocked;
     btn.style.opacity=blocked?'0.5':'1';
     btn.style.cursor=blocked?'not-allowed':'pointer';
   }
+  // release global lock kalau unblock
+  if(!blocked) ghSetGlobalLock(false);
 }
 
 function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
@@ -1038,6 +1063,7 @@ function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
         status.textContent='✓ Deploy berjaya: '+c.name+' → '+c.branch;
         showNotif('🚀 '+c.name+' berjaya deploy!','ok');
         if(ds){ ds.style.color='var(--amber)'; ds.textContent='⏳ GitHub Pages sedang build... tekan 🔍 untuk check'; }
+        ghSetGlobalLock(true);
         ghSetDeployBlock(idx, true);
         setTimeout(function(){ ghCheckStatus(idx); }, 30000);
       } else {
@@ -1045,6 +1071,7 @@ function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
         status.textContent='✕ '+(data.message||'Gagal');
         showNotif('Deploy gagal: '+(data.message||''),'err');
         if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ Deploy gagal'; }
+        ghSetGlobalLock(false);
         ghSetDeployBlock(idx, false);
       }
     })
@@ -1053,13 +1080,14 @@ function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
       status.textContent='✕ Error: '+e.message;
       showNotif('Deploy gagal','err');
       if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
+      ghSetGlobalLock(false);
       ghSetDeployBlock(idx, false);
     });
 }
 
 function ghDeploy(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
-  if(c.deployBlocked){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
+  if(_ghGlobalLock||c.deployBlocked){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
   var token=ghGetToken();
   if(!token){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
   var content=inp().value;
