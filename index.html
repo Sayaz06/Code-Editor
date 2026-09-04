@@ -292,6 +292,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="btn" onclick="closeAllPanels()">Tutup</button>
     <button class="btn primary" onclick="triggerUpload();closeAllPanels()">Upload Baru</button>
     <button class="btn success" onclick="newCloudFile()">+ Fail Baru</button>
+    <button class="btn danger" onclick="closeFile();closeAllPanels()">✕ Tutup Fail</button>
   </div>
 </div>
 
@@ -467,6 +468,24 @@ function deleteCloudFile(name){
   }).catch(function(e){ showNotif('Gagal padam: '+e.message,'err'); });
 }
 
+function renameCloudFile(oldName){
+  var newName = prompt('Nama baru untuk '+oldName+':',oldName);
+  if(!newName||newName===oldName) return;
+  showNotif('Menamakan semula...','info');
+  fbCollection().doc(oldName).get().then(function(doc){
+    if(!doc.exists){showNotif('Fail tidak dijumpai','err');return;}
+    var data = doc.data();
+    data.name = newName;
+    return fbCollection().doc(newName).set(data).then(function(){
+      return fbCollection().doc(oldName).delete();
+    });
+  }).then(function(){
+    if(S.fileName===oldName){ S.fileName=newName; updateStatusBar(); }
+    showNotif('Dinamakan semula: '+newName,'ok');
+    renderFilesBody();
+  }).catch(function(e){ showNotif('Gagal rename: '+e.message,'err'); });
+}
+
 function newCloudFile(){
   var name = prompt('Nama fail baru:','index.html');
   if(!name) return;
@@ -476,6 +495,16 @@ function newCloudFile(){
   updateAll(); saveToStorage();
   closeAllPanels();
   showNotif('Fail baru: '+name,'ok');
+}
+
+function closeFile(){
+  if(!confirm('Tutup fail dan kembali ke editor kosong?')) return;
+  pushUndo();
+  S.fileName = '';
+  inp().value = '';
+  localStorage.removeItem(KEY_FILE);
+  updateAll();
+  showNotif('Fail ditutup','info');
 }
 
 // ═══════════════════════════════════
@@ -568,7 +597,7 @@ function updateStatusBar(){
   document.getElementById('status-file').textContent=S.fileName||'Tiada fail';
 }
 function checkEmpty(){
-  document.getElementById('empty-state').classList.toggle('show',!inp().value);
+  document.getElementById('empty-state').classList.toggle('show', false);
 }
 
 // ═══════════════════════════════════
@@ -891,7 +920,7 @@ function renderFilesBody(){
       files.forEach(function(f){
         var sz=f.size>1024?Math.round(f.size/1024)+' KB':f.size+' B';
         var isActive=f.name===S.fileName;
-        html+='<div class="file-item'+(isActive?' active-file':'')+'"><span class="file-icon">☁</span><div class="file-info"><div class="file-name">'+f.name+'</div><div class="file-meta">'+sz+'</div></div><button class="file-act" onclick="loadCloudFile(\''+f.name+'\')">Buka</button><button class="file-del" onclick="deleteCloudFile(\''+f.name+'\')">🗑</button></div>';
+        html+='<div class="file-item'+(isActive?' active-file':'')+'"><span class="file-icon">☁</span><div class="file-info"><div class="file-name">'+f.name+'</div><div class="file-meta">'+sz+'</div></div><button class="file-act" onclick="loadCloudFile(\''+f.name+'\')">Buka</button><button class="file-act" style="border-color:var(--amber);color:var(--amber)" onclick="renameCloudFile(\''+f.name+'\')">✏</button><button class="file-del" onclick="deleteCloudFile(\''+f.name+'\')">🗑</button></div>';
       });
       body.innerHTML=html;
     });
