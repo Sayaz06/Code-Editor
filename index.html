@@ -190,7 +190,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="top-btn green" onclick="backupToFirebase()" title="Simpan ke Firebase">☁</button>
     <button class="top-btn accent" onclick="downloadFile()" title="Download">⬇</button>
     <button class="top-btn" onclick="previewHTML()" title="Preview" style="width:auto;padding:0 10px;font-size:13px">👁 Preview</button>
-    <button class="top-btn" onclick="doLogout()" title="Log Keluar" style="font-size:13px">↩</button>
+
   </div>
 
   <!-- TOOLBAR -->
@@ -290,11 +290,12 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="nav-tab" onclick="showTab('backup')">🔄 Backup</div>
   </div>
   <div class="panel-body" id="files-body"></div>
-  <div class="panel-footer">
+<div class="panel-footer">
     <button class="btn" onclick="closeAllPanels()">Tutup</button>
     <button class="btn primary" onclick="triggerUpload();closeAllPanels()">Upload Baru</button>
     <button class="btn success" onclick="newCloudFile()">+ Fail Baru</button>
     <button class="btn danger" onclick="closeFile();closeAllPanels()">✕ Tutup Fail</button>
+    <button class="btn" style="border-color:var(--red);color:var(--red)" onclick="doLogout()">↩ Log Keluar</button>
   </div>
 </div>
 
