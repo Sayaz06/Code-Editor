@@ -927,7 +927,7 @@ function ghRenderList(){
   }
   var html='';
   list.forEach(function(c,i){
-    var blocked=c.deployBlocked||false;
+    var blocked=_ghGlobalLock||c.deployBlocked||false;
     html+='<div class="file-item" style="flex-wrap:wrap;gap:6px" id="gh-item-'+i+'">'+
       '<div class="file-info" style="width:100%">'+
         '<div class="file-name">'+c.name+'</div>'+
