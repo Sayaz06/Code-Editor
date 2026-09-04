@@ -515,7 +515,8 @@ function closeFile(){
 var S = {
   fileName:'',undoStack:[],redoStack:[],
   selStart:-1,selEnd:-1,selMode:false,
-  searchResults:[],searchIdx:0,currentTab:'cloud'
+  searchResults:[],searchIdx:0,currentTab:'cloud',
+  undoStacks:{},redoStacks:{}
 };
 var KEY_FILE='kodedit_v2_file';
 var KEY_RECENT='kodedit_v2_recent';
@@ -569,27 +570,6 @@ function setupEditor(){
   el.addEventListener('keyup',updateCursor);
   el.addEventListener('click',updateCursor);
   el.addEventListener('mouseup',updateCursor);
-  el.addEventListener('blur',function(){
-    if(!currentUser) return;
-    var content=el.value; if(!content) return;
-    if(!S.fileName){
-      var name=prompt('Nama fail untuk disimpan ke Firebase:','index.html');
-      if(!name) return;
-      S.fileName=name; updateStatusBar();
-    }
-    showNotif('Menyimpan...','info');
-    fbCollection().doc(S.fileName).set({
-      name:S.fileName,
-      content:content,
-      updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
-      size:content.length
-    }).then(function(){
-      showNotif('✓ Autosave: '+S.fileName,'ok');
-      saveRecent(S.fileName,content);
-    }).catch(function(e){
-      showNotif('Autosave gagal: '+e.message,'err');
-    });
-  });
 }
 
 function syncScroll(){
@@ -886,22 +866,36 @@ function unhighlightDone(){
 // ═══════════════════════════════════
 // UNDO / REDO
 // ═══════════════════════════════════
+function getUndoStack(){
+  var key=S.fileName||'__free__';
+  if(!S.undoStacks[key]) S.undoStacks[key]=[];
+  return S.undoStacks[key];
+}
+function getRedoStack(){
+  var key=S.fileName||'__free__';
+  if(!S.redoStacks[key]) S.redoStacks[key]=[];
+  return S.redoStacks[key];
+}
 function pushUndo(){
-  var el=inp();
-  S.undoStack.push({v:el.value,s:el.selectionStart});
-  if(S.undoStack.length>50) S.undoStack.shift();
-  S.redoStack=[];
+  var el=inp(),stack=getUndoStack();
+  stack.push({v:el.value,s:el.selectionStart});
+  if(stack.length>50) stack.shift();
+  S.redoStacks[S.fileName||'__free__']=[];
 }
 function doUndo(){
-  if(!S.undoStack.length){showNotif('Tiada lagi undo','info');return;}
-  var el=inp(); S.redoStack.push({v:el.value,s:el.selectionStart});
-  var p=S.undoStack.pop(); el.value=p.v; el.setSelectionRange(p.s,p.s);
+  var stack=getUndoStack();
+  if(!stack.length){showNotif('Tiada lagi undo','info');return;}
+  var el=inp(),rstack=getRedoStack();
+  rstack.push({v:el.value,s:el.selectionStart});
+  var p=stack.pop(); el.value=p.v; el.setSelectionRange(p.s,p.s);
   updateAll(); saveToStorage(); showUndoToast('Undo ✓');
 }
 function doRedo(){
-  if(!S.redoStack.length){showNotif('Tiada lagi redo','info');return;}
-  var el=inp(); S.undoStack.push({v:el.value,s:el.selectionStart});
-  var p=S.redoStack.pop(); el.value=p.v; el.setSelectionRange(p.s,p.s);
+  var rstack=getRedoStack();
+  if(!rstack.length){showNotif('Tiada lagi redo','info');return;}
+  var el=inp(),stack=getUndoStack();
+  stack.push({v:el.value,s:el.selectionStart});
+  var p=rstack.pop(); el.value=p.v; el.setSelectionRange(p.s,p.s);
   updateAll(); saveToStorage(); showUndoToast('Redo ✓');
 }
 function showUndoToast(msg){
