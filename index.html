@@ -1041,7 +1041,6 @@ function ghSetDeployBlock(idx, blocked){
     btn.style.opacity=blocked?'0.5':'1';
     btn.style.cursor=blocked?'not-allowed':'pointer';
   }
-  if(!blocked) ghSetGlobalLock(false);
 }
 
 function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
