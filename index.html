@@ -327,6 +327,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       </div>
     </div>
 
+    <!-- BROWSE REPO -->
+    <div id="gh-browse-view" style="display:none">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <button class="tool-btn" onclick="ghBrowseBack()" id="gh-browse-back" style="padding:4px 10px;display:none">← Balik</button>
+        <div id="gh-browse-path" style="font-size:12px;color:var(--accent);flex:1;word-break:break-all"></div>
+      </div>
+      <div id="gh-browse-list"></div>
+    </div>
+
     <!-- FORM TAMBAH/EDIT APP -->
     <div id="gh-form-view" style="display:none">
       <input type="hidden" id="gh-edit-idx" value="-1">
@@ -360,6 +369,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <div class="panel-footer" id="gh-footer-token" style="display:none">
     <button class="btn" onclick="ghShowTab('list')">Batal</button>
     <button class="btn amber" onclick="ghSaveToken()">💾 Simpan Token</button>
+  </div>
+  <div class="panel-footer" id="gh-footer-browse" style="display:none">
+    <button class="btn" onclick="ghShowTab('list')">← Senarai App</button>
   </div>
 </div>
 
@@ -634,13 +646,15 @@ function ghSaveToken(){
 }
 
 function ghShowTab(tab){
-  var isList=tab==='list', isForm=tab==='form', isToken=tab==='token';
+  var isList=tab==='list',isForm=tab==='form',isToken=tab==='token',isBrowse=tab==='browse';
   document.getElementById('gh-list-view').style.display=isList?'block':'none';
   document.getElementById('gh-form-view').style.display=isForm?'block':'none';
   document.getElementById('gh-token-view').style.display=isToken?'block':'none';
+  document.getElementById('gh-browse-view').style.display=isBrowse?'block':'none';
   document.getElementById('gh-footer-list').style.display=isList?'flex':'none';
   document.getElementById('gh-footer-form').style.display=isForm?'flex':'none';
   document.getElementById('gh-footer-token').style.display=isToken?'flex':'none';
+  document.getElementById('gh-footer-browse').style.display=isBrowse?'flex':'none';
   document.getElementById('gh-tab-list').classList.toggle('active',isList);
   document.getElementById('gh-tab-token').classList.toggle('active',isToken);
   document.getElementById('gh-status').textContent='';
@@ -651,6 +665,90 @@ function ghShowTab(tab){
     document.getElementById('gh-token-status').textContent=t?'✓ Token tersimpan':'Belum ada token';
     document.getElementById('gh-token-status').style.color=t?'var(--green)':'var(--text2)';
   }
+}
+
+var _ghBrowseIdx=-1,_ghBrowsePath='',_ghBrowseHistory=[];
+
+function ghBrowse(idx){
+  _ghBrowseIdx=idx; _ghBrowsePath=''; _ghBrowseHistory=[];
+  ghShowTab('browse'); ghFetchBrowse('');
+}
+
+function ghBrowseBack(){
+  if(!_ghBrowseHistory.length) return;
+  _ghBrowsePath=_ghBrowseHistory.pop();
+  ghFetchBrowse(_ghBrowsePath);
+}
+
+function ghFetchBrowse(path){
+  var list=ghGetConfigs(); var c=list[_ghBrowseIdx]; if(!c) return;
+  var token=ghGetToken();
+  var browseList=document.getElementById('gh-browse-list');
+  var browsePath=document.getElementById('gh-browse-path');
+  var browseBack=document.getElementById('gh-browse-back');
+  browseList.innerHTML='<div style="color:var(--text2);font-size:13px;padding:10px">⏳ Memuatkan...</div>';
+  browsePath.textContent=c.repo+(path?'/'+path:'');
+  browseBack.style.display=path?'block':'none';
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+(path||'')+'?ref='+c.branch;
+  var headers={'Accept':'application/vnd.github.v3+json'};
+  if(token) headers['Authorization']='token '+token;
+  fetch(apiUrl,{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!Array.isArray(data)){
+        browseList.innerHTML='<div style="color:var(--red);font-size:13px;padding:10px">✕ '+(data.message||'Gagal')+'</div>';
+        return;
+      }
+      data.sort(function(a,b){
+        if(a.type===b.type) return a.name.localeCompare(b.name);
+        return a.type==='dir'?-1:1;
+      });
+      var html='';
+      data.forEach(function(item){
+        var icon=item.type==='dir'?'📁':'📄';
+        var isCode=item.name.match(/\.(html|htm|js|css|txt|json|md|xml|php|py)$/i);
+        html+='<div class="file-item" onclick="ghBrowseItem(\''+item.path.replace(/'/g,"\\'") +'\',\''+item.type+'\')">'+
+          '<span class="file-icon">'+icon+'</span>'+
+          '<div class="file-info">'+
+            '<div class="file-name">'+item.name+'</div>'+
+            '<div class="file-meta">'+(item.type==='dir'?'Folder':(item.size>1024?Math.round(item.size/1024)+' KB':item.size+' B'))+'</div>'+
+          '</div>'+
+          (item.type==='file'&&isCode?'<button class="file-act" onclick="event.stopPropagation();ghBrowseOpen(\''+item.path.replace(/'/g,"\\'")+'\')">Buka</button>':'')+
+        '</div>';
+      });
+      browseList.innerHTML=html||'<div style="color:var(--text2);font-size:13px;padding:10px">Folder kosong</div>';
+    })
+    .catch(function(e){ browseList.innerHTML='<div style="color:var(--red);font-size:13px;padding:10px">✕ '+e.message+'</div>'; });
+}
+
+function ghBrowseItem(path,type){
+  if(type==='dir'){
+    _ghBrowseHistory.push(_ghBrowsePath);
+    _ghBrowsePath=path;
+    ghFetchBrowse(path);
+  }
+}
+
+function ghBrowseOpen(path){
+  var list=ghGetConfigs(); var c=list[_ghBrowseIdx]; if(!c) return;
+  var token=ghGetToken();
+  showNotif('Memuatkan '+path+'...','info');
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+path+'?ref='+c.branch;
+  var headers={'Accept':'application/vnd.github.v3+json'};
+  if(token) headers['Authorization']='token '+token;
+  fetch(apiUrl,{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!data.content){showNotif('Gagal baca fail','err');return;}
+      var content=decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+      pushUndo();
+      S.fileName=path.split('/').pop();
+      inp().value=content;
+      updateAll(); saveToStorage();
+      closeAllPanels();
+      showNotif('Dibuka dari GitHub: '+S.fileName,'ok');
+    })
+    .catch(function(e){ showNotif('Gagal: '+e.message,'err'); });
 }
 
 function ghRenderList(){
@@ -669,6 +767,7 @@ function ghRenderList(){
         '<div class="gh-deploy-status" id="gh-ds-'+i+'" style="font-size:11px;margin-top:4px;min-height:14px"></div>'+
       '</div>'+
       '<button class="btn success" style="flex:1;padding:6px" onclick="ghDeploy('+i+')">🚀 Deploy</button>'+
+      '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="ghBrowse('+i+')">📂</button>'+
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--accent);color:var(--accent)" onclick="ghCheckStatus('+i+')">🔍</button>'+
       '<button class="btn amber" style="flex:none;padding:6px 10px" onclick="ghEditConfig('+i+')">✏</button>'+
       '<button class="btn danger" style="flex:none;padding:6px 10px" onclick="ghDeleteConfig('+i+')">🗑</button>'+
@@ -1007,6 +1106,21 @@ function setupEditor(){
   el.addEventListener('keyup',updateCursor);
   el.addEventListener('click',updateCursor);
   el.addEventListener('mouseup',updateCursor);
+  el.addEventListener('blur',function(){
+    if(!currentUser) return;
+    var content=el.value; if(!content) return;
+    if(!S.fileName){
+      var name=prompt('Nama fail untuk disimpan ke Firebase:','index.html');
+      if(!name) return;
+      S.fileName=name; updateStatusBar();
+    }
+    saveFileToFirebase(S.fileName, content).then(function(){
+      showNotif('✓ Autosave: '+S.fileName,'ok');
+      saveRecent(S.fileName,content);
+    }).catch(function(e){
+      showNotif('Autosave gagal: '+e.message,'err');
+    });
+  });
 }
 
 function syncScroll(){
@@ -1146,12 +1260,7 @@ function previewHTML(){
   if(!tab){showNotif('Benarkan popup untuk preview','err');return;}
   setTimeout(function(){URL.revokeObjectURL(url);},10000);
   if(currentUser&&S.fileName){
-    fbCollection().doc(S.fileName).set({
-      name:S.fileName,
-      content:content,
-      updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
-      size:content.length
-    }).then(function(){
+    saveFileToFirebase(S.fileName,content).then(function(){
       showNotif('Preview dibuka + disimpan ke Firebase','ok');
     }).catch(function(){
       showNotif('Preview dibuka (gagal simpan)','err');
