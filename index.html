@@ -503,8 +503,6 @@ function ghShowTab(tab){
   document.getElementById('gh-form-view').style.display = isList?'none':'block';
   document.getElementById('gh-footer-list').style.display = isList?'flex':'none';
   document.getElementById('gh-footer-form').style.display = isList?'none':'flex';
-  document.getElementById('gh-tab-list').classList.toggle('active', isList);
-  document.getElementById('gh-tab-form').classList.toggle('active', !isList);
   document.getElementById('gh-status').textContent='';
   if(isList) ghRenderList();
 }
