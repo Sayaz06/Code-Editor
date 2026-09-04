@@ -740,20 +740,45 @@ function ghBrowseOpen(path){
   var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+path+'?ref='+c.branch;
   var headers={'Accept':'application/vnd.github.v3+json'};
   if(token) headers['Authorization']='token '+token;
+
+  function setFile(content){
+    pushUndo();
+    S.fileName=path.split('/').pop();
+    S.filePath=path;
+    S.fileRepo=c.repo;
+    S.fileBranch=c.branch;
+    inp().value=content;
+    updateAll(); saveToStorage();
+    closeAllPanels();
+    showNotif('Dibuka dari GitHub: '+path,'ok');
+  }
+
   fetch(apiUrl,{headers:headers})
     .then(function(r){return r.json();})
     .then(function(data){
-      if(!data.content){showNotif('Gagal baca fail','err');return;}
-      var content=decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
-      pushUndo();
-      S.fileName=path.split('/').pop();
-      S.filePath=path;
-      S.fileRepo=c.repo;
-      S.fileBranch=c.branch;
-      inp().value=content;
-      updateAll(); saveToStorage();
-      closeAllPanels();
-      showNotif('Dibuka dari GitHub: '+path,'ok');
+      // fail kecil — ada content base64
+      if(data.content){
+        try{
+          var content=decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+          setFile(content);
+        }catch(e){
+          // atob gagal — cuba download_url
+          if(data.download_url){
+            return fetch(data.download_url).then(function(r){return r.text();}).then(setFile);
+          }
+          showNotif('Gagal decode fail','err');
+        }
+        return;
+      }
+      // fail besar — tiada content, guna download_url
+      if(data.download_url){
+        showNotif('Fail besar — memuat dari download_url...','info');
+        return fetch(data.download_url).then(function(r){
+          if(!r.ok) throw new Error('HTTP '+r.status);
+          return r.text();
+        }).then(setFile);
+      }
+      showNotif('Fail tidak dapat dibaca (terlalu besar atau tiada akses)','err');
     })
     .catch(function(e){ showNotif('Gagal: '+e.message,'err'); });
 }
