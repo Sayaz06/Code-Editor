@@ -420,6 +420,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 
 <script>
 // ═══════════════════════════════════
@@ -437,7 +438,59 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 var auth = firebase.auth();
 var db = firebase.firestore();
+var storage = firebase.storage();
 var currentUser = null;
+
+// Saiz maksimum Firestore (800KB selamat)
+var FIRESTORE_MAX = 800000;
+
+function fbStoragePath(name){
+  return 'users/'+currentUser.uid+'/files/'+name;
+}
+
+function saveToFirestore(name, content){
+  return fbCollection().doc(name).set({
+    name: name,
+    content: content,
+    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+    size: content.length,
+    inStorage: false
+  });
+}
+
+function saveToStorage(name, content){
+  var ref = storage.ref(fbStoragePath(name));
+  var blob = new Blob([content], {type:'text/plain'});
+  return ref.put(blob).then(function(){
+    return fbCollection().doc(name).set({
+      name: name,
+      content: '',
+      updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      size: content.length,
+      inStorage: true
+    });
+  });
+}
+
+function saveFileToFirebase(name, content){
+  if(content.length > FIRESTORE_MAX){
+    showNotif('Fail besar — simpan ke Firebase Storage...','info');
+    return saveToStorage(name, content);
+  } else {
+    return saveToFirestore(name, content);
+  }
+}
+
+function loadFileFromFirebase(doc){
+  if(doc.inStorage){
+    var ref = storage.ref(fbStoragePath(doc.name));
+    return ref.getDownloadURL().then(function(url){
+      return fetch(url).then(function(r){ return r.text(); });
+    });
+  } else {
+    return Promise.resolve(doc.content);
+  }
+}
 
 // ═══════════════════════════════════
 // AUTH
@@ -731,13 +784,9 @@ function backupToFirebase(){
     S.fileName = name;
   }
   showNotif('Menyimpan ke Firebase...','info');
-  fbCollection().doc(name).set({
-    name: name,
-    content: content,
-    updatedAt: firebase.firestore.FieldValue.serverTimestamp(),
-    size: content.length
-  }).then(function(){
-    showNotif('✓ Disimpan ke Firebase: '+name,'ok');
+  saveFileToFirebase(name, content).then(function(){
+    var loc = content.length > FIRESTORE_MAX ? 'Storage' : 'Firestore';
+    showNotif('✓ Disimpan ke Firebase '+loc+': '+name,'ok');
     saveRecent(name, content);
     updateStatusBar();
   }).catch(function(e){
@@ -761,12 +810,14 @@ function loadCloudFile(name){
   fbCollection().doc(name).get().then(function(doc){
     if(!doc.exists){showNotif('Fail tidak dijumpai','err');return;}
     var d = doc.data();
-    pushUndo();
-    S.fileName = d.name;
-    inp().value = d.content;
-    updateAll(); saveToStorage();
-    closeAllPanels();
-    showNotif('Dibuka: '+d.name,'ok');
+    return loadFileFromFirebase(d).then(function(content){
+      pushUndo();
+      S.fileName = d.name;
+      inp().value = content;
+      updateAll(); saveToStorage();
+      closeAllPanels();
+      showNotif('Dibuka: '+d.name+(d.inStorage?' (Storage)':''),'ok');
+    });
   }).catch(function(e){ showNotif('Gagal muat: '+e.message,'err'); });
 }
 
@@ -878,26 +929,6 @@ function setupEditor(){
   el.addEventListener('keyup',updateCursor);
   el.addEventListener('click',updateCursor);
   el.addEventListener('mouseup',updateCursor);
-  el.addEventListener('blur',function(){
-    if(!currentUser) return;
-    var content=el.value; if(!content) return;
-    if(!S.fileName){
-      var name=prompt('Nama fail untuk disimpan ke Firebase:','index.html');
-      if(!name) return;
-      S.fileName=name; updateStatusBar();
-    }
-    fbCollection().doc(S.fileName).set({
-      name:S.fileName,
-      content:content,
-      updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
-      size:content.length
-    }).then(function(){
-      showNotif('✓ Autosave: '+S.fileName,'ok');
-      saveRecent(S.fileName,content);
-    }).catch(function(e){
-      showNotif('Autosave gagal: '+e.message,'err');
-    });
-  });
 }
 
 function syncScroll(){
