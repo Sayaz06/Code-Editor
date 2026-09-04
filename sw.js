@@ -1,4 +1,4 @@
-var CACHE = 'kodedit-v3';
+var CACHE = 'kodedit-v4';
 var FILES = [
   './index.html',
   './manifest.json',
