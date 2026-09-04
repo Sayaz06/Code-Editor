@@ -1076,7 +1076,12 @@ function ghSetDeployBlock(idx, blocked){
     btn.style.opacity=blocked?'0.5':'1';
     btn.style.cursor=blocked?'not-allowed':'pointer';
   }
-  if(!blocked) ghSetGlobalLock(false);
+  // release global lock hanya kalau tiada app lain yang masih blocked
+  if(!blocked){
+    var stillBlocked=configs.some(function(c){ return c.deployBlocked; });
+    var origStillBlocked=S.origDeployBlocked||false;
+    if(!stillBlocked&&!origStillBlocked) ghSetGlobalLock(false);
+  }
 }
 
 function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
