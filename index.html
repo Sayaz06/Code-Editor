@@ -618,6 +618,9 @@ function ghLoadFromFirebase(callback){
       var d = doc.data();
       _ghToken = d.token||'';
       _ghConfigs = d.configs||[];
+      _ghGlobalLock = d.globalLock||false;
+      // restore UI lock
+      if(_ghGlobalLock) setTimeout(function(){ ghSetGlobalLock(true); },500);
     }
     if(callback) callback();
   }).catch(function(){ if(callback) callback(); });
@@ -627,7 +630,8 @@ function ghSaveToFirebase(){
   if(!currentUser){ showNotif('Log masuk dahulu','err'); return; }
   return ghFbDoc().set({
     token: _ghToken,
-    configs: _ghConfigs
+    configs: _ghConfigs,
+    globalLock: _ghGlobalLock||false
   });
 }
 
@@ -1025,6 +1029,12 @@ function ghSetGlobalLock(locked){
     origBtn.disabled=locked;
     origBtn.style.opacity=locked?'0.5':'1';
     origBtn.style.cursor=locked?'not-allowed':'pointer';
+  }
+  // simpan ke Firestore
+  if(currentUser){
+    ghFbDoc().update({globalLock: locked}).catch(function(){
+      ghSaveToFirebase();
+    });
   }
 }
 
