@@ -1157,7 +1157,7 @@ function jumpToLine(){
 // ═══════════════════════════════════
 function showTab(tab){
   S.currentTab=tab;
-  document.querySelectorAll('.nav-tab').forEach(function(t,i){
+  document.querySelectorAll('#nav-tabs .nav-tab').forEach(function(t,i){
     t.classList.toggle('active',(i===0&&tab==='cloud')||(i===1&&tab==='local')||(i===2&&tab==='backup'));
   });
   renderFilesBody();
