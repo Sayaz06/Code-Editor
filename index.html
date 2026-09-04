@@ -878,6 +878,26 @@ function setupEditor(){
   el.addEventListener('keyup',updateCursor);
   el.addEventListener('click',updateCursor);
   el.addEventListener('mouseup',updateCursor);
+  el.addEventListener('blur',function(){
+    if(!currentUser) return;
+    var content=el.value; if(!content) return;
+    if(!S.fileName){
+      var name=prompt('Nama fail untuk disimpan ke Firebase:','index.html');
+      if(!name) return;
+      S.fileName=name; updateStatusBar();
+    }
+    fbCollection().doc(S.fileName).set({
+      name:S.fileName,
+      content:content,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      size:content.length
+    }).then(function(){
+      showNotif('✓ Autosave: '+S.fileName,'ok');
+      saveRecent(S.fileName,content);
+    }).catch(function(e){
+      showNotif('Autosave gagal: '+e.message,'err');
+    });
+  });
 }
 
 function syncScroll(){
