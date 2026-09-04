@@ -289,7 +289,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     </div>
     <div id="rp-bulk-view" style="display:none">
       <div class="storage-note">Tampal output AI dalam format:<br><strong>Cari:</strong><br>[kod lama]<br><strong>Ganti:</strong><br>[kod baru]<br><br>Boleh ada banyak blok berturutan.</div>
-      <textarea class="field" id="bulk-input" rows="10" placeholder="Tampal semua blok Cari/Ganti di sini..."></textarea>
+      <textarea class="field" id="bulk-input" rows="10" placeholder="Tampal semua blok Cari/Ganti di sini..." oninput="liveBulkPreview()"></textarea>
       <div id="bulk-status" style="font-size:12px;margin-top:8px;min-height:18px;color:var(--text2)"></div>
     </div>
   </div>
@@ -1184,9 +1184,45 @@ function clearReplace(){
   _foundResults=[];
 }
 
+var _bulkTimer=null;
 function clearBulk(){
   document.getElementById('bulk-input').value='';
   document.getElementById('bulk-status').textContent='';
+}
+
+function liveBulkPreview(){
+  clearTimeout(_bulkTimer);
+  _bulkTimer=setTimeout(_liveBulkPreview,400);
+}
+
+function _liveBulkPreview(){
+  var raw=document.getElementById('bulk-input').value;
+  var status=document.getElementById('bulk-status');
+  if(!raw.trim()){status.textContent='';return;}
+  var pairs=parseBulkInput(raw);
+  if(!pairs.length){
+    status.style.color='var(--text2)';
+    status.textContent='Tiada blok Cari/Ganti dijumpai';
+    return;
+  }
+  var content=inp().value;
+  var jumpa=0,tidakJumpa=0;
+  pairs.forEach(function(p){
+    var found=flexFind(content,p.find);
+    if(found.length) jumpa++; else tidakJumpa++;
+  });
+  var msg='';
+  if(jumpa&&!tidakJumpa){
+    status.style.color='var(--green)';
+    msg='✓ '+jumpa+' blok dijumpai';
+  } else if(jumpa&&tidakJumpa){
+    status.style.color='var(--amber)';
+    msg='✓ '+jumpa+' blok dijumpai  |  ✕ '+tidakJumpa+' blok tidak selaras';
+  } else {
+    status.style.color='var(--red)';
+    msg='✕ '+tidakJumpa+' blok tidak dijumpai';
+  }
+  status.textContent=msg;
 }
 
 function parseBulkInput(raw){
