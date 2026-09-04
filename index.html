@@ -498,25 +498,53 @@ function doLogout(){
 // ═══════════════════════════════════
 // GITHUB DEPLOY
 // ═══════════════════════════════════
-var KEY_GH = 'kodedit_gh_configs';
-var KEY_GH_TOKEN = 'kodedit_gh_token';
+var _ghToken = '';
+var _ghConfigs = [];
 
-function ghGetConfigs(){
-  try{ return JSON.parse(localStorage.getItem(KEY_GH)||'[]'); }catch(e){ return []; }
+function ghFbDoc(){
+  return db.collection('users').doc(currentUser.uid).collection('settings').doc('github');
 }
+
+function ghLoadFromFirebase(callback){
+  if(!currentUser){ callback(); return; }
+  ghFbDoc().get().then(function(doc){
+    if(doc.exists){
+      var d = doc.data();
+      _ghToken = d.token||'';
+      _ghConfigs = d.configs||[];
+    }
+    if(callback) callback();
+  }).catch(function(){ if(callback) callback(); });
+}
+
+function ghSaveToFirebase(){
+  if(!currentUser){ showNotif('Log masuk dahulu','err'); return; }
+  return ghFbDoc().set({
+    token: _ghToken,
+    configs: _ghConfigs
+  });
+}
+
+function ghGetConfigs(){ return _ghConfigs; }
+
 function ghSaveConfigs(list){
-  localStorage.setItem(KEY_GH, JSON.stringify(list));
+  _ghConfigs = list;
+  ghSaveToFirebase().then(function(){
+    showNotif('Disimpan ke Firebase','ok');
+  }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
 }
-function ghGetToken(){
-  return localStorage.getItem(KEY_GH_TOKEN)||'';
-}
+
+function ghGetToken(){ return _ghToken; }
+
 function ghSaveToken(){
   var token=document.getElementById('gh-token').value.trim();
   if(!token){showNotif('Isi token dahulu','err');return;}
-  localStorage.setItem(KEY_GH_TOKEN, token);
-  document.getElementById('gh-token-status').style.color='var(--green)';
-  document.getElementById('gh-token-status').textContent='✓ Token disimpan';
-  showNotif('Token disimpan!','ok');
+  _ghToken = token;
+  ghSaveToFirebase().then(function(){
+    document.getElementById('gh-token-status').style.color='var(--green)';
+    document.getElementById('gh-token-status').textContent='✓ Token disimpan ke Firebase';
+    showNotif('Token disimpan!','ok');
+  }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
 }
 
 function ghShowTab(tab){
@@ -582,8 +610,11 @@ function ghEditConfig(idx){
 function ghDeleteConfig(idx){
   var list=ghGetConfigs();
   if(!confirm('Padam config "'+list[idx].name+'"?')) return;
-  list.splice(idx,1); ghSaveConfigs(list);
-  ghRenderList(); showNotif('Config dipadam','ok');
+  list.splice(idx,1);
+  _ghConfigs=list;
+  ghSaveToFirebase().then(function(){
+    ghRenderList(); showNotif('Config dipadam','ok');
+  });
 }
 
 function ghSaveConfig(){
@@ -597,9 +628,11 @@ function ghSaveConfig(){
   var idx=parseInt(document.getElementById('gh-edit-idx').value);
   var config={name:name,repo:repo,path:path,branch:branch};
   if(idx>=0) list[idx]=config; else list.push(config);
-  ghSaveConfigs(list);
-  showNotif('Config disimpan!','ok');
-  ghShowTab('list');
+  _ghConfigs=list;
+  ghSaveToFirebase().then(function(){
+    showNotif('Config disimpan!','ok');
+    ghShowTab('list');
+  }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
 }
 
 function ghDeploy(idx){
@@ -1262,7 +1295,9 @@ function openPanel(id){
     document.getElementById(id).classList.add('open');
     document.getElementById('overlay').classList.add('show');
     if(id==='files-panel') renderFilesBody();
-if(id==='github-panel') ghShowTab('list');
+if(id==='github-panel'){
+      ghLoadFromFirebase(function(){ ghShowTab('list'); });
+    }
     if(id==='replace-panel'){
       document.getElementById('replace-preview').style.display='none';
       setTimeout(function(){document.getElementById('replace-find').focus();},350);
