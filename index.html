@@ -796,12 +796,20 @@ function backupToFirebase(){
 
 function loadCloudFiles(callback){
   if(!currentUser){callback([]);return;}
-  fbCollection().orderBy('updatedAt','desc').get()
+  fbCollection().get()
     .then(function(snap){
       var files=[];
-      snap.forEach(function(doc){ files.push(doc.data()); });
+      snap.forEach(function(doc){
+        var d=doc.data();
+        if(d&&d.name) files.push(d);
+      });
+      files.sort(function(a,b){
+        var ta=a.updatedAt&&a.updatedAt.toMillis?a.updatedAt.toMillis():0;
+        var tb=b.updatedAt&&b.updatedAt.toMillis?b.updatedAt.toMillis():0;
+        return tb-ta;
+      });
       callback(files);
-    }).catch(function(){ callback([]); });
+    }).catch(function(e){ console.log('loadCloudFiles err:',e); callback([]); });
 }
 
 function loadCloudFile(name){
@@ -1427,7 +1435,9 @@ function renderFilesBody(){
           var d=f.updatedAt.toDate();
           dt=' · '+d.toLocaleDateString('ms-MY')+' '+d.toLocaleTimeString('ms-MY',{hour:'2-digit',minute:'2-digit',hour12:true});
         }
-        html+='<div class="file-item'+(isActive?' active-file':'')+'"><span class="file-icon">☁</span><div class="file-info"><div class="file-name">'+f.name+'</div><div class="file-meta">'+sz+dt+'</div></div><button class="file-act" onclick="loadCloudFile(\''+f.name+'\')">Buka</button><button class="file-act" style="border-color:var(--amber);color:var(--amber)" onclick="renameCloudFile(\''+f.name+'\')">✏</button><button class="file-del" onclick="deleteCloudFile(\''+f.name+'\')">🗑</button></div>';
+        var icon=f.inStorage?'🗄':'☁';
+        var storageTag=f.inStorage?'<span style="font-size:10px;color:var(--amber);margin-left:4px">Storage</span>':'';
+        html+='<div class="file-item'+(isActive?' active-file':'')+'"><span class="file-icon">'+icon+'</span><div class="file-info"><div class="file-name">'+f.name+storageTag+'</div><div class="file-meta">'+sz+dt+'</div></div><button class="file-act" onclick="loadCloudFile(\''+f.name+'\')">Buka</button><button class="file-act" style="border-color:var(--amber);color:var(--amber)" onclick="renameCloudFile(\''+f.name+'\')">✏</button><button class="file-del" onclick="deleteCloudFile(\''+f.name+'\')">🗑</button></div>';
       });
       body.innerHTML=html;
     });
