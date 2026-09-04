@@ -801,7 +801,6 @@ function ghSetOrigBlock(blocked){
     ds.style.color=blocked?'var(--amber)':'var(--green)';
     ds.textContent=blocked?'⏳ Menunggu Pages build... tekan 🔍 untuk check':'';
   }
-  // release global lock kalau unblock
   if(!blocked) ghSetGlobalLock(false);
   // simpan state dalam Firebase
   if(currentUser){
@@ -1016,13 +1015,11 @@ var _ghGlobalLock=false;
 
 function ghSetGlobalLock(locked){
   _ghGlobalLock=locked;
-  // block semua button deploy dalam senarai
   document.querySelectorAll('#gh-apps-list .btn.success').forEach(function(btn){
     btn.disabled=locked;
     btn.style.opacity=locked?'0.5':'1';
     btn.style.cursor=locked?'not-allowed':'pointer';
   });
-  // block button deploy original
   var origBtn=document.getElementById('btn-deploy-orig');
   if(origBtn){
     origBtn.disabled=locked;
@@ -1044,7 +1041,6 @@ function ghSetDeployBlock(idx, blocked){
     btn.style.opacity=blocked?'0.5':'1';
     btn.style.cursor=blocked?'not-allowed':'pointer';
   }
-  // release global lock kalau unblock
   if(!blocked) ghSetGlobalLock(false);
 }
 
