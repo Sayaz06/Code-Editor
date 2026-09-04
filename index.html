@@ -178,6 +178,13 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <input class="login-field" id="login-email" type="email" placeholder="Email">
   <input class="login-field" id="login-pass" type="password" placeholder="Kata laluan">
   <button class="login-btn" onclick="doLogin()">Log Masuk</button>
+  <div style="display:flex;align-items:center;gap:10px;width:100%;max-width:320px;margin:8px 0">
+    <div style="flex:1;height:1px;background:var(--border)"></div>
+    <span style="font-size:12px;color:var(--text2)">atau</span>
+    <div style="flex:1;height:1px;background:var(--border)"></div>
+  </div>
+  <input class="login-field" id="login-pin" type="password" inputmode="numeric" maxlength="6" placeholder="Admin PIN" style="letter-spacing:4px;text-align:center">
+  <button class="login-btn" onclick="doLoginPin()" style="background:var(--surface2);border:1px solid var(--border)">Masuk dengan PIN</button>
   <div id="login-msg"></div>
 </div>
 
@@ -295,7 +302,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="btn primary" onclick="triggerUpload();closeAllPanels()">Upload Baru</button>
     <button class="btn success" onclick="newCloudFile()">+ Fail Baru</button>
     <button class="btn danger" onclick="closeFile();closeAllPanels()">✕ Tutup Fail</button>
-    <button class="btn" style="border-color:var(--red);color:var(--red)" onclick="doLogout()">↩ Log Keluar</button>
+<button class="btn" style="border-color:var(--red);color:var(--red)" onclick="doLogout()">↩ Log Keluar</button>
+    <button class="btn" id="btn-set-pin" style="display:none;border-color:var(--amber);color:var(--amber)" onclick="setAdminPin()">🔑 Set PIN</button>
   </div>
 </div>
 
@@ -366,6 +374,9 @@ auth.onAuthStateChanged(function(user){
   if(user){
     currentUser = user;
     document.getElementById('login-screen').classList.add('hide');
+    // tunjuk butang set PIN kalau admin
+    var btnPin = document.getElementById('btn-set-pin');
+    if(btnPin) btnPin.style.display = user.email===ADMIN_EMAIL ? 'block' : 'none';
     loadFromStorage();
     setupEditor();
     setupLongPress();
@@ -377,6 +388,8 @@ auth.onAuthStateChanged(function(user){
     document.getElementById('login-screen').classList.remove('hide');
   }
 });
+
+var ADMIN_EMAIL = 'adha86614@gmail.com';
 
 function doLogin(){
   var email = document.getElementById('login-email').value.trim();
@@ -395,8 +408,27 @@ function doLogin(){
     });
 }
 
+function doLoginPin(){
+  var pin = document.getElementById('login-pin').value.trim();
+  var msg = document.getElementById('login-msg');
+  if(!pin||pin.length<4){msg.textContent='PIN mesti sekurang-kurangnya 4 digit';return;}
+  msg.textContent='Mengesahkan PIN...';
+  db.collection('admin').doc('pin').get().then(function(doc){
+    if(!doc.exists){msg.textContent='PIN belum ditetapkan';return;}
+    var savedPin = doc.data().pin;
+    if(pin !== savedPin){msg.textContent='PIN salah';return;}
+    msg.textContent='Log masuk...';
+    auth.signInWithEmailAndPassword(ADMIN_EMAIL, doc.data().pass)
+      .then(function(){ msg.textContent=''; })
+      .catch(function(e){ msg.textContent=e.message||e.code; });
+  }).catch(function(e){ msg.textContent='Gagal: '+e.message; });
+}
+
 document.getElementById('login-pass').addEventListener('keydown',function(e){
   if(e.key==='Enter') doLogin();
+});
+document.getElementById('login-pin').addEventListener('keydown',function(e){
+  if(e.key==='Enter') doLoginPin();
 });
 
 function doLogout(){
@@ -404,6 +436,20 @@ function doLogout(){
   auth.signOut().then(function(){
     showNotif('Dah log keluar','info');
   });
+}
+
+function setAdminPin(){
+  if(!currentUser||currentUser.email!==ADMIN_EMAIL){showNotif('Hanya admin boleh set PIN','err');return;}
+  var pin = prompt('PIN baru (4-6 digit):');
+  if(!pin||!/^\d{4,6}$/.test(pin)){showNotif('PIN mesti 4-6 digit nombor','err');return;}
+  var pass = prompt('Masukkan password admin untuk sahkan:');
+  if(!pass){return;}
+  db.collection('admin').doc('pin').set({
+    pin: pin,
+    pass: pass
+  }).then(function(){
+    showNotif('✓ PIN berjaya ditetapkan','ok');
+  }).catch(function(e){ showNotif('Gagal: '+e.message,'err'); });
 }
 
 // ═══════════════════════════════════
