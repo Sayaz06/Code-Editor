@@ -408,27 +408,48 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <div class="panel-title">📖 Panduan Guna</div>
   <div class="panel-body">
     <div class="storage-note">
-      <strong>☁ Firebase:</strong> Fail disimpan dalam Firestore cloud — boleh akses dari mana-mana device. Tekan butang ☁ untuk backup ke Firebase. <strong>📱 Tempatan:</strong> localStorage sebagai cache, data hilang jika clear cache.
+      <strong>☁ Firestore:</strong> Fail kod disimpan dalam cloud — sync antara phone dan laptop. Fail besar (>800KB) auto simpan ke <strong>Firebase Storage</strong>. <strong>📱 localStorage:</strong> Cache tempatan sahaja — hilang bila clear cache browser.
     </div>
     <div class="info-section">
       <h3>Flow Kerja</h3>
-      <div class="info-row"><span>1.</span><span>Edit kat phone → tekan ☁ Simpan ke Firebase</span></div>
-      <div class="info-row"><span>2.</span><span>Buka laptop → buka KodEdit → fail dah ada dalam ☁ Firebase</span></div>
-      <div class="info-row"><span>3.</span><span>Sambung edit → simpan semula ke Firebase</span></div>
+      <div class="info-row"><span>1.</span><span>Edit kat phone → autosave ke Firebase bila keluar textarea</span></div>
+      <div class="info-row"><span>2.</span><span>Buka laptop → log masuk → fail dah ada dalam panel 📁</span></div>
+      <div class="info-row"><span>3.</span><span>Edit → autosave → deploy terus dari KodEdit</span></div>
+    </div>
+    <div class="info-section">
+      <h3>Simpan & Buka Fail</h3>
+      <div class="info-row"><span>☁</span><span>Butang ☁ — simpan fail semasa ke Firebase terus</span></div>
+      <div class="info-row"><span>📁</span><span>Butang 📁 — panel fail: tab Firebase, Tempatan, Backup</span></div>
+      <div class="info-row"><span>⬆</span><span>Butang ⬆ — upload fail dari telefon/laptop</span></div>
+      <div class="info-row"><span>⬇</span><span>Butang ⬇ — download fail ke peranti</span></div>
+    </div>
+    <div class="info-section">
+      <h3>Ganti Kod</h3>
+      <div class="info-row"><span>🔄</span><span>Tab Ganti — cari dan ganti satu blok kod, tidak kisah indent/space</span></div>
+      <div class="info-row"><span>⚡</span><span>Tab Ganti Pukal — tampal banyak blok Cari/Ganti sekaligus (format AI)</span></div>
+      <div class="info-row"><span>↵</span><span>Tekan Pergi untuk scroll dan highlight kod yang dijumpai</span></div>
     </div>
     <div class="info-section">
       <h3>Pilih Baris</h3>
-      <div class="info-row"><span>1.</span><span>Tekan butang Pilih → tap baris mula</span></div>
+      <div class="info-row"><span>1.</span><span>Tekan butang ☰ Pilih → tap baris mula</span></div>
       <div class="info-row"><span>2.</span><span>Tap baris akhir → bar pilihan muncul</span></div>
+      <div class="info-row"><span>→</span><span>Boleh Salin, Potong, atau terus ke Ganti</span></div>
     </div>
     <div class="info-section">
-      <h3>Cari & Ganti</h3>
-      <div class="info-row"><span>→</span><span>Tidak kisah indent/space, support multiline</span></div>
-      <div class="info-row"><span>→</span><span>Tekan ↵ Pergi untuk scroll ke kod yang dijumpai</span></div>
+      <h3>Deploy ke GitHub</h3>
+      <div class="info-row"><span>🚀</span><span>Butang 🚀 Deploy — buka panel deploy, pilih app, tekan Deploy</span></div>
+      <div class="info-row"><span>📂</span><span>Butang 📂 Browse — browse fail dalam repo, buka terus ke editor</span></div>
+      <div class="info-row"><span>🔍</span><span>Butang 🔍 — check status GitHub Pages build</span></div>
+      <div class="info-row"><span>→</span><span>Selepas deploy, button diblock sehingga Pages siap build</span></div>
+    </div>
+    <div class="info-section">
+      <h3>Preview</h3>
+      <div class="info-row"><span>👁</span><span>Butang Preview — buka HTML dalam tab baru + auto simpan ke Firebase</span></div>
+      <div class="info-row"><span>→</span><span>Preview guna domain GitHub Pages — Firebase dan JS berfungsi</span></div>
     </div>
     <div class="info-section">
       <h3>Shortcut Desktop</h3>
-      <div class="info-row"><span>→</span><span>Ctrl+Z/Y = Undo/Redo, Ctrl+F = Ganti, Ctrl+S = Download</span></div>
+      <div class="info-row"><span>→</span><span>Ctrl+Z = Undo, Ctrl+Y = Redo, Ctrl+F = Buka Ganti, Ctrl+S = Download</span></div>
     </div>
   </div>
   <div class="panel-footer">
