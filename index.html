@@ -833,13 +833,14 @@ function ghRenderList(){
   }
   var html='';
   list.forEach(function(c,i){
+    var blocked=c.deployBlocked||false;
     html+='<div class="file-item" style="flex-wrap:wrap;gap:6px" id="gh-item-'+i+'">'+
       '<div class="file-info" style="width:100%">'+
         '<div class="file-name">'+c.name+'</div>'+
         '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
-        '<div class="gh-deploy-status" id="gh-ds-'+i+'" style="font-size:11px;margin-top:4px;min-height:14px"></div>'+
+        '<div class="gh-deploy-status" id="gh-ds-'+i+'" style="font-size:11px;margin-top:4px;min-height:14px">'+(blocked?'⏳ Menunggu Pages build...':'')+'</div>'+
       '</div>'+
-      '<button class="btn success" style="flex:1;padding:6px" onclick="ghDeploy('+i+')">🚀 Deploy</button>'+
+      '<button class="btn success" style="flex:1;padding:6px;opacity:'+(blocked?'0.5':'1')+';cursor:'+(blocked?'not-allowed':'pointer')+'" onclick="ghDeploy('+i+')" '+(blocked?'disabled':'')+'>🚀 Deploy</button>'+
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="ghBrowse('+i+')">📂</button>'+
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--accent);color:var(--accent)" onclick="ghCheckStatus('+i+')">🔍</button>'+
       '<button class="btn amber" style="flex:none;padding:6px 10px" onclick="ghEditConfig('+i+')">✏</button>'+
@@ -915,12 +916,14 @@ function ghCheckStatus(idx){
         if(st==='built'){
           ds.style.color='var(--green)';
           ds.textContent='✓ Pages dah live';
+          ghSetDeployBlock(idx, false);
         } else if(st==='building'){
           ds.style.color='var(--amber)';
           ds.textContent='⏳ Sedang build... tekan 🔍 semula';
         } else if(st==='errored'){
           ds.style.color='var(--red)';
           ds.textContent='✕ Build error: '+(latest.error&&latest.error.message||'unknown');
+          ghSetDeployBlock(idx, false);
         } else {
           ds.style.color='var(--text2)';
           ds.textContent='Status: '+st;
@@ -928,6 +931,7 @@ function ghCheckStatus(idx){
       } else if(data.message){
         ds.style.color='var(--red)';
         ds.textContent='✕ '+data.message;
+        ghSetDeployBlock(idx, false);
       } else {
         ds.style.color='var(--text2)';
         ds.textContent='Tiada data build';
@@ -938,7 +942,23 @@ function ghCheckStatus(idx){
     });
 }
 
-function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds){
+function ghSetDeployBlock(idx, blocked){
+  if(!currentUser) return;
+  var configs=ghGetConfigs();
+  if(!configs[idx]) return;
+  configs[idx].deployBlocked=blocked;
+  _ghConfigs=configs;
+  ghSaveToFirebase();
+  // update button UI
+  var btn=document.querySelector('#gh-item-'+idx+' .btn.success');
+  if(btn){
+    btn.disabled=blocked;
+    btn.style.opacity=blocked?'0.5':'1';
+    btn.style.cursor=blocked?'not-allowed':'pointer';
+  }
+}
+
+function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
   var body={
     message:'Update '+c.path+' via KodEdit',
     content:btoa(unescape(encodeURIComponent(content))),
@@ -953,12 +973,14 @@ function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds){
         status.textContent='✓ Deploy berjaya: '+c.name+' → '+c.branch;
         showNotif('🚀 '+c.name+' berjaya deploy!','ok');
         if(ds){ ds.style.color='var(--amber)'; ds.textContent='⏳ GitHub Pages sedang build... tekan 🔍 untuk check'; }
+        ghSetDeployBlock(idx, true);
         setTimeout(function(){ ghCheckStatus(idx); }, 30000);
       } else {
         status.style.color='var(--red)';
         status.textContent='✕ '+(data.message||'Gagal');
         showNotif('Deploy gagal: '+(data.message||''),'err');
         if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ Deploy gagal'; }
+        ghSetDeployBlock(idx, false);
       }
     })
     .catch(function(e){
@@ -966,11 +988,13 @@ function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds){
       status.textContent='✕ Error: '+e.message;
       showNotif('Deploy gagal','err');
       if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
+      ghSetDeployBlock(idx, false);
     });
 }
 
 function ghDeploy(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
+  if(c.deployBlocked){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
   var token=ghGetToken();
   if(!token){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
   var content=inp().value;
@@ -993,7 +1017,7 @@ function ghDeploy(idx){
     .then(function(data){
       var sha=data.sha||null;
       status.textContent='⏳ Menghantar fail...';
-      ghDoActualDeploy(apiUrl,headers,content,sha,c,status,ds);
+      ghDoActualDeploy(apiUrl,headers,content,sha,c,status,ds,idx);
     })
     .catch(function(e){
       status.style.color='var(--red)';
