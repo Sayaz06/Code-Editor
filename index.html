@@ -871,15 +871,19 @@ function ghCheckOrigStatus(){
         var st=latest.status;
         var updatedAt=latest.updated_at?new Date(latest.updated_at):null;
         var deployTime=S.origDeployTime||0;
-        if(st==='built'){
-          // pastikan build ni adalah untuk deploy terkini
+if(st==='built'){
           if(!S.origDeployBlocked){
             ds.style.color='var(--green)'; ds.textContent='✓ Pages dah live';
-          } else if(updatedAt&&updatedAt.getTime()>deployTime){
-            ds.style.color='var(--green)'; ds.textContent='✓ Pages dah live';
-            ghSetOrigBlock(false);
           } else {
-            ds.style.color='var(--amber)'; ds.textContent='⏳ Menunggu build baru... tekan 🔍 semula';
+            var now=Date.now();
+            var elapsed=now-(S.origDeployTime||0);
+            // minimum 15 saat selepas deploy baru boleh unlock
+            if(elapsed>15000&&updatedAt&&updatedAt.getTime()>(S.origDeployTime||0)){
+              ds.style.color='var(--green)'; ds.textContent='✓ Pages dah live';
+              ghSetOrigBlock(false);
+            } else {
+              ds.style.color='var(--amber)'; ds.textContent='⏳ Menunggu build baru... tekan 🔍 semula';
+            }
           }
         } else if(st==='building'){
           ds.style.color='var(--amber)'; ds.textContent='⏳ Sedang build... tekan 🔍 semula';
@@ -908,6 +912,7 @@ function ghDeployOriginal(){
   var ds=document.getElementById('gh-orig-status');
   status.style.color='var(--accent)';
   status.textContent='⏳ Deploy ke '+S.filePath+'...';
+S.origDeployTime=Date.now();
   if(ds){ ds.style.color='var(--accent)'; ds.textContent='⏳ Deploying...'; }
   var apiUrl='https://api.github.com/repos/'+S.fileRepo+'/contents/'+S.filePath;
   var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
