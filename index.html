@@ -53,6 +53,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .sel-bar-btn.cut{border-color:var(--red);color:var(--red)}
 .sel-bar-btn.cut:active{background:var(--red);color:#fff}
 
+/* FILE TREE */
+#filetree-wrap{display:none;flex-direction:column;border-bottom:2px solid var(--border);background:var(--surface3);flex-shrink:0}
+#filetree-wrap.show{display:flex}
+#filetree-header{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--border);flex-shrink:0}
+#filetree-path{font-size:11px;color:var(--accent);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:var(--font-mono)}
+#filetree-list{overflow-x:auto;overflow-y:hidden;display:flex;flex-direction:row;gap:4px;padding:6px 10px;-webkit-overflow-scrolling:touch;min-height:44px;align-items:center}
+#filetree-list::-webkit-scrollbar{display:none}
+.ft-item{display:flex;align-items:center;gap:4px;padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;color:var(--text2)}
+.ft-item:active{background:var(--accent);color:#0f0f1a;border-color:var(--accent)}
+.ft-item.ft-active{border-color:var(--green);color:var(--green)}
+.ft-item.ft-dir{color:var(--amber);border-color:rgba(255,209,102,0.3)}
+.ft-back{color:var(--accent);border-color:rgba(76,201,240,0.3)}
+
 /* EDITOR */
 #editor-wrap{flex:1;overflow:hidden;display:flex;flex-direction:column;position:relative}
 #editor-container{display:flex;flex:1;overflow:hidden}
@@ -212,6 +225,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="tool-btn" onclick="copyAll()">📋 Salin Semua</button>
     <button class="tool-btn" onclick="pasteAll()">📥 Tampal Semua</button>
     <button class="tool-btn" onclick="openPanel('info-panel')">ℹ Panduan</button>
+    <button class="tool-btn" id="btn-filetree" onclick="toggleFileTree()">📁 Repo</button>
   </div></div>
 
   <!-- DROP ZONE -->
@@ -224,6 +238,16 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="sel-bar-btn cut" onclick="cutSelected()">Potong</button>
     <button class="sel-bar-btn" onclick="openReplaceFromSel()">Ganti</button>
     <button class="sel-bar-btn" onclick="clearSelection()">✕</button>
+  </div>
+
+  <!-- FILE TREE -->
+  <div id="filetree-wrap">
+    <div id="filetree-header">
+      <span style="font-size:14px">📁</span>
+      <span id="filetree-path">Tiada repo dipilih</span>
+      <button class="tool-btn" onclick="toggleFileTree()" style="padding:3px 8px;font-size:11px">✕ Tutup</button>
+    </div>
+    <div id="filetree-list"></div>
   </div>
 
   <!-- EDITOR -->
@@ -712,6 +736,124 @@ function ghBrowseBack(){
   if(!_ghBrowseHistory.length) return;
   _ghBrowsePath=_ghBrowseHistory.pop();
   ghFetchBrowse(_ghBrowsePath);
+}
+
+// ═══════════════════════════════════
+// FILE TREE (inline atas editor)
+// ═══════════════════════════════════
+var _ftIdx=-1, _ftPath='', _ftHistory=[];
+
+function toggleFileTree(){
+  var wrap=document.getElementById('filetree-wrap');
+  var isShow=wrap.classList.contains('show');
+  if(isShow){
+    wrap.classList.remove('show');
+  } else {
+    // guna config pertama atau _ghBrowseIdx
+    var configs=ghGetConfigs();
+    if(!configs.length){ showNotif('Tambah app dalam Deploy dahulu','err'); return; }
+    // kalau ada fail dibuka dari browse, guna repo tu
+    if(S.fileRepo){
+      _ftIdx=_ghBrowseIdx>=0?_ghBrowseIdx:0;
+    } else {
+      _ftIdx=0;
+    }
+    _ftPath=''; _ftHistory=[];
+    wrap.classList.add('show');
+    ftFetch('');
+  }
+}
+
+function ftFetch(path){
+  var configs=ghGetConfigs();
+  var c=configs[_ftIdx]; if(!c) return;
+  var token=ghGetToken();
+  var list=document.getElementById('filetree-list');
+  var pathEl=document.getElementById('filetree-path');
+  list.innerHTML='<span style="color:var(--text2);font-size:12px">⏳ Memuatkan...</span>';
+  pathEl.textContent=c.repo+(path?'/'+path:'');
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+(path||'')+'?ref='+c.branch;
+  var headers={'Accept':'application/vnd.github.v3+json'};
+  if(token) headers['Authorization']='token '+token;
+  fetch(apiUrl,{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!Array.isArray(data)){
+        list.innerHTML='<span style="color:var(--red);font-size:12px">✕ '+(data.message||'Gagal')+'</span>';
+        return;
+      }
+      data.sort(function(a,b){
+        if(a.type===b.type) return a.name.localeCompare(b.name);
+        return a.type==='dir'?-1:1;
+      });
+      var html='';
+      if(_ftHistory.length){
+        html+='<div class="ft-item ft-back" onclick="ftBack()">← Balik</div>';
+      }
+      data.forEach(function(item){
+        var icon=item.type==='dir'?'📁':'📄';
+        var isActive=item.path===S.filePath;
+        var cls='ft-item'+(item.type==='dir'?' ft-dir':'')+(isActive?' ft-active':'');
+        html+='<div class="'+cls+'" onclick="ftTap(\''+item.path.replace(/'/g,"\\'")+'\',\''+item.type+'\',\''+item.name.replace(/'/g,"\\'")+'\')">'+icon+' '+item.name+'</div>';
+      });
+      list.innerHTML=html||'<span style="color:var(--text2);font-size:12px">Kosong</span>';
+    })
+    .catch(function(e){ list.innerHTML='<span style="color:var(--red);font-size:12px">✕ '+e.message+'</span>'; });
+}
+
+function ftBack(){
+  if(!_ftHistory.length) return;
+  _ftPath=_ftHistory.pop();
+  ftFetch(_ftPath);
+}
+
+function ftTap(path,type,name){
+  if(type==='dir'){
+    _ftHistory.push(_ftPath);
+    _ftPath=path;
+    ftFetch(path);
+  } else {
+    // buka fail terus ke editor
+    var configs=ghGetConfigs();
+    var c=configs[_ftIdx]; if(!c) return;
+    var token=ghGetToken();
+    showNotif('Memuatkan '+name+'...','info');
+    var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+path+'?ref='+c.branch;
+    var headers={'Accept':'application/vnd.github.v3+json'};
+    if(token) headers['Authorization']='token '+token;
+    fetch(apiUrl,{headers:headers})
+      .then(function(r){return r.json();})
+      .then(function(data){
+        function setFile(content){
+          pushUndo();
+          S.fileName=name;
+          S.filePath=path;
+          S.fileRepo=c.repo;
+          S.fileBranch=c.branch;
+          _ghBrowseIdx=_ftIdx;
+          inp().value=content;
+          updateAll(); saveToStorage();
+          // refresh tree untuk highlight fail aktif
+          ftFetch(_ftPath);
+          showNotif('Dibuka: '+name,'ok');
+        }
+        if(data.content){
+          try{
+            var content=decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
+            setFile(content);
+          }catch(e){
+            if(data.download_url) fetch(data.download_url).then(function(r){return r.text();}).then(setFile);
+            else showNotif('Gagal decode','err');
+          }
+        } else if(data.download_url){
+          showNotif('Fail besar — memuat...','info');
+          fetch(data.download_url).then(function(r){return r.text();}).then(setFile);
+        } else {
+          showNotif('Fail tidak boleh dibaca','err');
+        }
+      })
+      .catch(function(e){ showNotif('Gagal: '+e.message,'err'); });
+  }
 }
 
 function ghFetchBrowse(path){
