@@ -196,7 +196,8 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="top-btn" onclick="triggerUpload()" title="Upload">⬆</button>
     <button class="top-btn green" onclick="backupToFirebase()" title="Simpan ke Firebase">☁</button>
     <button class="top-btn accent" onclick="downloadFile()" title="Download">⬇</button>
-    <button class="top-btn" onclick="previewHTML()" title="Preview" style="width:auto;padding:0 10px;font-size:13px">👁 Preview</button>
+<button class="top-btn" onclick="previewHTML()" title="Preview" style="width:auto;padding:0 10px;font-size:13px">👁 Preview</button>
+    <button class="top-btn" onclick="openPanel('github-panel')" title="Deploy ke GitHub" style="width:auto;padding:0 10px;font-size:13px;border-color:rgba(255,255,255,0.3);color:var(--text)">🚀 Deploy</button>
 
   </div>
 
@@ -281,10 +282,38 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div style="font-size:12px;color:var(--text2);margin-top:6px" id="preview-count"></div>
     </div>
   </div>
-  <div class="panel-footer">
+<div class="panel-footer">
     <button class="btn" onclick="previewReplace()">Preview</button>
     <button class="btn success" onclick="doReplace()">Ganti Semua</button>
+    <button class="btn" onclick="clearReplace()">🗑 Clear</button>
     <button class="btn danger" onclick="closeAllPanels()">Batal</button>
+  </div>
+</div>
+
+<!-- GITHUB PANEL -->
+<div class="panel" id="github-panel">
+  <div class="panel-handle"></div>
+  <div class="panel-title">🚀 Deploy ke GitHub</div>
+  <div class="panel-body">
+    <div class="storage-note">
+      <strong>GitHub Personal Access Token</strong> diperlukan. Jana dari: GitHub → Settings → Developer settings → Personal access tokens → Generate new token → pilih scope <strong>repo</strong>.
+    </div>
+    <div class="field-label">GitHub Token</div>
+    <input class="field field-sm" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+    <div class="field-label" style="margin-top:10px">Owner / Repo</div>
+    <input class="field field-sm" id="gh-repo" type="text" placeholder="sayaz06/nama-repo">
+    <div class="field-label" style="margin-top:10px">Path fail dalam repo</div>
+    <input class="field field-sm" id="gh-path" type="text" placeholder="index.html">
+    <div class="field-label" style="margin-top:10px">Branch</div>
+    <input class="field field-sm" id="gh-branch" type="text" placeholder="main">
+    <div class="field-label" style="margin-top:10px">Mesej commit</div>
+    <input class="field field-sm" id="gh-msg" type="text" placeholder="Update via KodEdit">
+    <div id="gh-status" style="font-size:12px;margin-top:10px;min-height:18px;color:var(--text2)"></div>
+  </div>
+  <div class="panel-footer">
+    <button class="btn" onclick="closeAllPanels()">Batal</button>
+    <button class="btn amber" onclick="saveGhConfig()">💾 Simpan Config</button>
+    <button class="btn success" onclick="deployToGitHub()">🚀 Deploy Sekarang</button>
   </div>
 </div>
 
@@ -436,6 +465,101 @@ function doLogout(){
   auth.signOut().then(function(){
     showNotif('Dah log keluar','info');
   });
+}
+
+// ═══════════════════════════════════
+// GITHUB DEPLOY
+// ═══════════════════════════════════
+var KEY_GH = 'kodedit_gh_config';
+
+function loadGhConfig(){
+  try{
+    var raw = localStorage.getItem(KEY_GH);
+    if(!raw) return;
+    var c = JSON.parse(raw);
+    document.getElementById('gh-token').value = c.token||'';
+    document.getElementById('gh-repo').value = c.repo||'';
+    document.getElementById('gh-path').value = c.path||'';
+    document.getElementById('gh-branch').value = c.branch||'main';
+    document.getElementById('gh-msg').value = c.msg||'Update via KodEdit';
+  }catch(e){}
+}
+
+function saveGhConfig(){
+  var config = {
+    token: document.getElementById('gh-token').value.trim(),
+    repo: document.getElementById('gh-repo').value.trim(),
+    path: document.getElementById('gh-path').value.trim(),
+    branch: document.getElementById('gh-branch').value.trim()||'main',
+    msg: document.getElementById('gh-msg').value.trim()||'Update via KodEdit'
+  };
+  if(!config.token||!config.repo||!config.path){
+    showNotif('Isi Token, Repo dan Path dahulu','err'); return;
+  }
+  localStorage.setItem(KEY_GH, JSON.stringify(config));
+  showNotif('Config disimpan!','ok');
+}
+
+function deployToGitHub(){
+  var token = document.getElementById('gh-token').value.trim();
+  var repo = document.getElementById('gh-repo').value.trim();
+  var path = document.getElementById('gh-path').value.trim();
+  var branch = document.getElementById('gh-branch').value.trim()||'main';
+  var msg = document.getElementById('gh-msg').value.trim()||'Update via KodEdit';
+  var status = document.getElementById('gh-status');
+  var content = inp().value;
+
+  if(!token||!repo||!path){showNotif('Isi Token, Repo dan Path dahulu','err');return;}
+  if(!content){showNotif('Tiada kandungan untuk deploy','err');return;}
+
+  status.style.color='var(--accent)';
+  status.textContent='⏳ Mendapatkan SHA fail semasa...';
+
+  var apiUrl = 'https://api.github.com/repos/'+repo+'/contents/'+path;
+  var headers = {
+    'Authorization': 'token '+token,
+    'Accept': 'application/vnd.github.v3+json',
+    'Content-Type': 'application/json'
+  };
+
+  // Dapatkan SHA fail semasa (diperlukan untuk update)
+  fetch(apiUrl+'?ref='+branch, {headers: headers})
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var sha = data.sha || null;
+      status.textContent='⏳ Menghantar fail...';
+
+      var body = {
+        message: msg,
+        content: btoa(unescape(encodeURIComponent(content))),
+        branch: branch
+      };
+      if(sha) body.sha = sha;
+
+      return fetch(apiUrl, {
+        method: 'PUT',
+        headers: headers,
+        body: JSON.stringify(body)
+      });
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      if(data.content){
+        status.style.color='var(--green)';
+        status.textContent='✓ Berjaya deploy: '+path+' → '+branch;
+        showNotif('🚀 Deploy berjaya!','ok');
+        saveGhConfig();
+      } else if(data.message){
+        status.style.color='var(--red)';
+        status.textContent='✕ '+data.message;
+        showNotif('Deploy gagal: '+data.message,'err');
+      }
+    })
+    .catch(function(e){
+      status.style.color='var(--red)';
+      status.textContent='✕ Error: '+e.message;
+      showNotif('Deploy gagal','err');
+    });
 }
 
 function setAdminPin(){
@@ -905,6 +1029,14 @@ function doReplace(){
   document.getElementById('overlay').classList.remove('show');
   showNotif(found.length+' gantian berjaya!','ok');
 }
+function clearReplace(){
+  document.getElementById('replace-find').value='';
+  document.getElementById('replace-with').value='';
+  document.getElementById('replace-preview').style.display='none';
+  document.getElementById('find-status').textContent='';
+  _foundResults=[];
+}
+
 function unhighlightDone(){
   var el=inp(); el.setSelectionRange(el.selectionStart,el.selectionStart);
   document.getElementById('unhighlight-bar').style.display='none';
@@ -1041,6 +1173,7 @@ function openPanel(id){
     document.getElementById(id).classList.add('open');
     document.getElementById('overlay').classList.add('show');
     if(id==='files-panel') renderFilesBody();
+    if(id==='github-panel') loadGhConfig();
     if(id==='replace-panel'){
       document.getElementById('replace-preview').style.display='none';
       setTimeout(function(){document.getElementById('replace-find').focus();},350);
