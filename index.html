@@ -321,6 +321,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
     <!-- SENARAI APP -->
     <div id="gh-list-view">
+      <div id="gh-deploy-original" style="display:none;margin-bottom:10px;padding:10px;background:rgba(6,214,160,0.1);border:1px solid rgba(6,214,160,0.3);border-radius:8px">
+        <div style="font-size:12px;color:var(--green);margin-bottom:6px" id="gh-original-info"></div>
+        <button class="btn success" style="width:100%" onclick="ghDeployOriginal()">🚀 Deploy to Original Path</button>
+      </div>
       <div id="gh-apps-list"></div>
       <div style="text-align:center;margin-top:8px">
         <button class="btn primary" style="max-width:180px" onclick="ghShowTab('form');ghNewConfig()">➕ Tambah App Baru</button>
@@ -743,17 +747,61 @@ function ghBrowseOpen(path){
       var content=decodeURIComponent(escape(atob(data.content.replace(/\n/g,''))));
       pushUndo();
       S.fileName=path.split('/').pop();
+      S.filePath=path;
+      S.fileRepo=c.repo;
+      S.fileBranch=c.branch;
       inp().value=content;
       updateAll(); saveToStorage();
       closeAllPanels();
-      showNotif('Dibuka dari GitHub: '+S.fileName,'ok');
+      showNotif('Dibuka dari GitHub: '+path,'ok');
     })
     .catch(function(e){ showNotif('Gagal: '+e.message,'err'); });
+}
+
+function ghDeployOriginal(){
+  if(!S.filePath||!S.fileRepo){showNotif('Tiada fail GitHub dibuka','err');return;}
+  var token=ghGetToken();
+  if(!token){showNotif('Simpan API Key dahulu','err');return;}
+  var content=inp().value;
+  if(!content){showNotif('Tiada kandungan','err');return;}
+  var status=document.getElementById('gh-status');
+  status.style.color='var(--accent)';
+  status.textContent='⏳ Deploy ke '+S.filePath+'...';
+  var apiUrl='https://api.github.com/repos/'+S.fileRepo+'/contents/'+S.filePath;
+  var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  fetch(apiUrl+'?ref='+S.fileBranch,{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var body={message:'Update '+S.filePath+' via KodEdit',content:btoa(unescape(encodeURIComponent(content))),branch:S.fileBranch};
+      if(data.sha) body.sha=data.sha;
+      return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)});
+    })
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.content){
+        status.style.color='var(--green)';
+        status.textContent='✓ Deploy berjaya: '+S.filePath;
+        showNotif('🚀 Deploy berjaya!','ok');
+      } else {
+        status.style.color='var(--red)';
+        status.textContent='✕ '+(data.message||'Gagal');
+        showNotif('Deploy gagal','err');
+      }
+    })
+    .catch(function(e){ status.style.color='var(--red)'; status.textContent='✕ '+e.message; showNotif('Deploy gagal','err'); });
 }
 
 function ghRenderList(){
   var list = ghGetConfigs();
   var el = document.getElementById('gh-apps-list');
+  var deployOrig=document.getElementById('gh-deploy-original');
+  var origInfo=document.getElementById('gh-original-info');
+  if(S.filePath&&S.fileRepo){
+    deployOrig.style.display='block';
+    origInfo.textContent='📄 '+S.fileRepo+'/'+S.filePath+' ('+S.fileBranch+')';
+  } else {
+    deployOrig.style.display='none';
+  }
   if(!list.length){
     el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app lagi. Tambah app baru.</div>';
     return;
@@ -1049,7 +1097,8 @@ function closeFile(){
 // STATE
 // ═══════════════════════════════════
 var S = {
-  fileName:'',undoStack:[],redoStack:[],
+  fileName:'',filePath:'',fileRepo:'',fileBranch:'',
+  undoStack:[],redoStack:[],
   selStart:-1,selEnd:-1,selMode:false,
   searchResults:[],searchIdx:0,currentTab:'cloud',
   undoStacks:{},redoStacks:{}
