@@ -295,8 +295,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 <div class="panel" id="github-panel">
   <div class="panel-handle"></div>
   <div class="panel-title">🚀 Deploy ke GitHub</div>
-<div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
-    <div class="nav-tab active" id="gh-tab-list" style="flex:1;cursor:default">📋 Senarai App</div>
+  <div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
+    <div class="nav-tab active" id="gh-tab-list" onclick="ghShowTab('list')" style="flex:1">📋 Senarai App</div>
+    <div class="nav-tab" id="gh-tab-token" onclick="ghShowTab('token')" style="flex:1">🔑 API Key</div>
   </div>
   <div class="panel-body">
 
@@ -308,20 +309,25 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       </div>
     </div>
 
-    <!-- FORM TAMBAH/EDIT -->
+    <!-- FORM TAMBAH/EDIT APP -->
     <div id="gh-form-view" style="display:none">
       <input type="hidden" id="gh-edit-idx" value="-1">
       <div class="field-label">Nama App (untuk rujukan)</div>
       <input class="field field-sm" id="gh-name" type="text" placeholder="contoh: App Istigfar">
-      <div class="field-label" style="margin-top:10px">GitHub Token</div>
-      <input class="field field-sm" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
-      <div style="font-size:11px;color:var(--text2);margin:4px 0 8px">Jana dari: GitHub → Settings → Developer settings → Personal access tokens → repo</div>
-      <div class="field-label">Owner / Repo</div>
+      <div class="field-label" style="margin-top:10px">Owner / Repo</div>
       <input class="field field-sm" id="gh-repo" type="text" placeholder="sayaz06/nama-repo">
       <div class="field-label" style="margin-top:10px">Path fail dalam repo</div>
       <input class="field field-sm" id="gh-path" type="text" placeholder="index.html">
       <div class="field-label" style="margin-top:10px">Branch</div>
       <input class="field field-sm" id="gh-branch" type="text" placeholder="main">
+    </div>
+
+    <!-- TAB API KEY -->
+    <div id="gh-token-view" style="display:none">
+      <div class="storage-note">Token ini digunakan untuk semua app. Jana dari: GitHub → Settings → Developer settings → Personal access tokens → Generate new token (classic) → tick <strong>repo</strong>.</div>
+      <div class="field-label" style="margin-top:10px">GitHub Token</div>
+      <input class="field field-sm" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+      <div id="gh-token-status" style="font-size:12px;margin-top:8px;color:var(--text2)"></div>
     </div>
 
     <div id="gh-status" style="font-size:12px;margin-top:10px;min-height:18px;color:var(--text2)"></div>
@@ -332,6 +338,10 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <div class="panel-footer" id="gh-footer-form" style="display:none">
     <button class="btn" onclick="ghShowTab('list')">Batal</button>
     <button class="btn amber" onclick="ghSaveConfig()">💾 Simpan</button>
+  </div>
+  <div class="panel-footer" id="gh-footer-token" style="display:none">
+    <button class="btn" onclick="ghShowTab('list')">Batal</button>
+    <button class="btn amber" onclick="ghSaveToken()">💾 Simpan Token</button>
   </div>
 </div>
 
@@ -489,6 +499,7 @@ function doLogout(){
 // GITHUB DEPLOY
 // ═══════════════════════════════════
 var KEY_GH = 'kodedit_gh_configs';
+var KEY_GH_TOKEN = 'kodedit_gh_token';
 
 function ghGetConfigs(){
   try{ return JSON.parse(localStorage.getItem(KEY_GH)||'[]'); }catch(e){ return []; }
@@ -496,15 +507,36 @@ function ghGetConfigs(){
 function ghSaveConfigs(list){
   localStorage.setItem(KEY_GH, JSON.stringify(list));
 }
+function ghGetToken(){
+  return localStorage.getItem(KEY_GH_TOKEN)||'';
+}
+function ghSaveToken(){
+  var token=document.getElementById('gh-token').value.trim();
+  if(!token){showNotif('Isi token dahulu','err');return;}
+  localStorage.setItem(KEY_GH_TOKEN, token);
+  document.getElementById('gh-token-status').style.color='var(--green)';
+  document.getElementById('gh-token-status').textContent='✓ Token disimpan';
+  showNotif('Token disimpan!','ok');
+}
 
 function ghShowTab(tab){
-  var isList = tab==='list';
-  document.getElementById('gh-list-view').style.display = isList?'block':'none';
-  document.getElementById('gh-form-view').style.display = isList?'none':'block';
-  document.getElementById('gh-footer-list').style.display = isList?'flex':'none';
-  document.getElementById('gh-footer-form').style.display = isList?'none':'flex';
+  var isList=tab==='list', isForm=tab==='form', isToken=tab==='token';
+  document.getElementById('gh-list-view').style.display=isList?'block':'none';
+  document.getElementById('gh-form-view').style.display=isForm?'block':'none';
+  document.getElementById('gh-token-view').style.display=isToken?'block':'none';
+  document.getElementById('gh-footer-list').style.display=isList?'flex':'none';
+  document.getElementById('gh-footer-form').style.display=isForm?'flex':'none';
+  document.getElementById('gh-footer-token').style.display=isToken?'flex':'none';
+  document.getElementById('gh-tab-list').classList.toggle('active',isList);
+  document.getElementById('gh-tab-token').classList.toggle('active',isToken);
   document.getElementById('gh-status').textContent='';
   if(isList) ghRenderList();
+  if(isToken){
+    var t=ghGetToken();
+    document.getElementById('gh-token').value=t;
+    document.getElementById('gh-token-status').textContent=t?'✓ Token tersimpan':'Belum ada token';
+    document.getElementById('gh-token-status').style.color=t?'var(--green)':'var(--text2)';
+  }
 }
 
 function ghRenderList(){
@@ -532,7 +564,6 @@ function ghRenderList(){
 function ghNewConfig(){
   document.getElementById('gh-edit-idx').value='-1';
   document.getElementById('gh-name').value='';
-  document.getElementById('gh-token').value='';
   document.getElementById('gh-repo').value='';
   document.getElementById('gh-path').value='';
   document.getElementById('gh-branch').value='main';
@@ -542,7 +573,6 @@ function ghEditConfig(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
   document.getElementById('gh-edit-idx').value=idx;
   document.getElementById('gh-name').value=c.name||'';
-  document.getElementById('gh-token').value=c.token||'';
   document.getElementById('gh-repo').value=c.repo||'';
   document.getElementById('gh-path').value=c.path||'';
   document.getElementById('gh-branch').value=c.branch||'main';
@@ -558,14 +588,14 @@ function ghDeleteConfig(idx){
 
 function ghSaveConfig(){
   var name=document.getElementById('gh-name').value.trim();
-  var token=document.getElementById('gh-token').value.trim();
   var repo=document.getElementById('gh-repo').value.trim();
   var path=document.getElementById('gh-path').value.trim();
   var branch=document.getElementById('gh-branch').value.trim()||'main';
-  if(!name||!token||!repo||!path){showNotif('Isi semua field','err');return;}
+  if(!name||!repo||!path){showNotif('Isi semua field','err');return;}
+  if(!ghGetToken()){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
   var list=ghGetConfigs();
   var idx=parseInt(document.getElementById('gh-edit-idx').value);
-  var config={name:name,token:token,repo:repo,path:path,branch:branch};
+  var config={name:name,repo:repo,path:path,branch:branch};
   if(idx>=0) list[idx]=config; else list.push(config);
   ghSaveConfigs(list);
   showNotif('Config disimpan!','ok');
@@ -574,6 +604,8 @@ function ghSaveConfig(){
 
 function ghDeploy(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
+  var token=ghGetToken();
+  if(!token){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
   var content=inp().value;
   if(!content){showNotif('Tiada kandungan untuk deploy','err');return;}
   var status=document.getElementById('gh-status');
@@ -582,7 +614,7 @@ function ghDeploy(idx){
 
   var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path;
   var headers={
-    'Authorization':'token '+c.token,
+    'Authorization':'token '+token,
     'Accept':'application/vnd.github.v3+json',
     'Content-Type':'application/json'
   };
@@ -1157,7 +1189,7 @@ function jumpToLine(){
 // ═══════════════════════════════════
 function showTab(tab){
   S.currentTab=tab;
-  document.querySelectorAll('#nav-tabs .nav-tab').forEach(function(t,i){
+  document.querySelectorAll('.nav-tab').forEach(function(t,i){
     t.classList.toggle('active',(i===0&&tab==='cloud')||(i===1&&tab==='local')||(i===2&&tab==='backup'));
   });
   renderFilesBody();
