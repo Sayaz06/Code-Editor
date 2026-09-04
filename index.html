@@ -1046,17 +1046,31 @@ function ghCheckStatus(idx){
       if(Array.isArray(data)&&data.length){
         var latest=data[0];
         var st=latest.status;
+        var updatedAt=latest.updated_at?new Date(latest.updated_at):null;
+        var deployTime=c.deployTime||0;
         if(st==='built'){
-          ds.style.color='var(--green)';
-          ds.textContent='✓ Pages dah live';
-          ghSetDeployBlock(idx, false);
+          if(!c.deployBlocked){
+            // tak deploy baru-baru ni, tunjuk status sahaja
+            ds.style.color='var(--green)';
+            ds.textContent='✓ Pages dah live';
+          } else {
+            var elapsed=Date.now()-deployTime;
+            if(elapsed>15000&&updatedAt&&updatedAt.getTime()>deployTime){
+              ds.style.color='var(--green)';
+              ds.textContent='✓ Pages dah live';
+              ghSetDeployBlock(idx, false);
+            } else {
+              ds.style.color='var(--amber)';
+              ds.textContent='⏳ Menunggu build baru... tekan 🔍 semula';
+            }
+          }
         } else if(st==='building'){
           ds.style.color='var(--amber)';
           ds.textContent='⏳ Sedang build... tekan 🔍 semula';
         } else if(st==='errored'){
           ds.style.color='var(--red)';
           ds.textContent='✕ Build error: '+(latest.error&&latest.error.message||'unknown');
-          ghSetDeployBlock(idx, false);
+          if(c.deployBlocked) ghSetDeployBlock(idx, false);
         } else {
           ds.style.color='var(--text2)';
           ds.textContent='Status: '+st;
@@ -1127,6 +1141,7 @@ function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
     branch:c.branch
   };
   if(sha) body.sha=sha;
+  var deployTime=Date.now();
   fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)})
     .then(function(r){return r.json();})
     .then(function(data){
@@ -1135,6 +1150,9 @@ function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
         status.textContent='✓ Deploy berjaya: '+c.name+' → '+c.branch;
         showNotif('🚀 '+c.name+' berjaya deploy!','ok');
         if(ds){ ds.style.color='var(--amber)'; ds.textContent='⏳ GitHub Pages sedang build... tekan 🔍 untuk check'; }
+        // simpan deployTime dalam config
+        var configs=ghGetConfigs();
+        if(configs[idx]){ configs[idx].deployTime=deployTime; _ghConfigs=configs; ghSaveToFirebase(); }
         ghSetGlobalLock(true);
         ghSetDeployBlock(idx, true);
         setTimeout(function(){ ghCheckStatus(idx); }, 30000);
