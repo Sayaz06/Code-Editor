@@ -840,13 +840,28 @@ function ghSetOrigBlock(blocked){
 }
 
 function ghCheckOrigStatus(){
-  if(!S.fileRepo||!S.fileBranch) return;
-  var token=ghGetToken();
-  if(!token) return;
+  var repo=S.fileRepo;
+  var branch=S.fileBranch||'main';
   var ds=document.getElementById('gh-orig-status');
+  if(!repo){
+    if(!currentUser) return;
+    db.collection('users').doc(currentUser.uid).collection('settings').doc('deployState').get()
+      .then(function(doc){
+        if(doc.exists&&doc.data().origRepo){
+          S.fileRepo=doc.data().origRepo;
+          S.fileBranch=doc.data().origBranch||'main';
+          ghCheckOrigStatus();
+        } else {
+          if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ Tiada repo — buka fail dari Browse dahulu'; }
+        }
+      });
+    return;
+  }
+  var token=ghGetToken();
+  if(!token){showNotif('Simpan API Key dahulu','err');return;}
   if(ds){ ds.style.color='var(--accent)'; ds.textContent='⏳ Checking...'; }
   var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'};
-  fetch('https://api.github.com/repos/'+S.fileRepo+'/pages/builds',{headers:headers})
+  fetch('https://api.github.com/repos/'+repo+'/pages/builds',{headers:headers})
     .then(function(r){return r.json();})
     .then(function(data){
       if(!ds) return;
@@ -860,9 +875,15 @@ function ghCheckOrigStatus(){
         } else if(st==='errored'){
           ds.style.color='var(--red)'; ds.textContent='✕ Build error';
           ghSetOrigBlock(false);
+        } else {
+          ds.style.color='var(--text2)'; ds.textContent='Status: '+st;
         }
+      } else if(data.message){
+        ds.style.color='var(--red)'; ds.textContent='✕ '+data.message;
       }
-    }).catch(function(){});
+    }).catch(function(e){
+      if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
+    });
 }
 
 function ghDeployOriginal(){
@@ -1027,7 +1048,6 @@ function ghCheckStatus(idx){
       } else if(data.message){
         ds.style.color='var(--red)';
         ds.textContent='✕ '+data.message;
-        ghSetDeployBlock(idx, false);
       } else {
         ds.style.color='var(--text2)';
         ds.textContent='Tiada data build';
