@@ -295,26 +295,43 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 <div class="panel" id="github-panel">
   <div class="panel-handle"></div>
   <div class="panel-title">🚀 Deploy ke GitHub</div>
+<div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
+    <div class="nav-tab active" id="gh-tab-list" style="flex:1;cursor:default">📋 Senarai App</div>
+  </div>
   <div class="panel-body">
-    <div class="storage-note">
-      <strong>GitHub Personal Access Token</strong> diperlukan. Jana dari: GitHub → Settings → Developer settings → Personal access tokens → Generate new token → pilih scope <strong>repo</strong>.
+
+    <!-- SENARAI APP -->
+    <div id="gh-list-view">
+      <div id="gh-apps-list"></div>
+      <div style="text-align:center;margin-top:8px">
+        <button class="btn primary" style="max-width:180px" onclick="ghShowTab('form');ghNewConfig()">➕ Tambah App Baru</button>
+      </div>
     </div>
-    <div class="field-label">GitHub Token</div>
-    <input class="field field-sm" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
-    <div class="field-label" style="margin-top:10px">Owner / Repo</div>
-    <input class="field field-sm" id="gh-repo" type="text" placeholder="sayaz06/nama-repo">
-    <div class="field-label" style="margin-top:10px">Path fail dalam repo</div>
-    <input class="field field-sm" id="gh-path" type="text" placeholder="index.html">
-    <div class="field-label" style="margin-top:10px">Branch</div>
-    <input class="field field-sm" id="gh-branch" type="text" placeholder="main">
-    <div class="field-label" style="margin-top:10px">Mesej commit</div>
-    <input class="field field-sm" id="gh-msg" type="text" placeholder="Update via KodEdit">
+
+    <!-- FORM TAMBAH/EDIT -->
+    <div id="gh-form-view" style="display:none">
+      <input type="hidden" id="gh-edit-idx" value="-1">
+      <div class="field-label">Nama App (untuk rujukan)</div>
+      <input class="field field-sm" id="gh-name" type="text" placeholder="contoh: App Istigfar">
+      <div class="field-label" style="margin-top:10px">GitHub Token</div>
+      <input class="field field-sm" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+      <div style="font-size:11px;color:var(--text2);margin:4px 0 8px">Jana dari: GitHub → Settings → Developer settings → Personal access tokens → repo</div>
+      <div class="field-label">Owner / Repo</div>
+      <input class="field field-sm" id="gh-repo" type="text" placeholder="sayaz06/nama-repo">
+      <div class="field-label" style="margin-top:10px">Path fail dalam repo</div>
+      <input class="field field-sm" id="gh-path" type="text" placeholder="index.html">
+      <div class="field-label" style="margin-top:10px">Branch</div>
+      <input class="field field-sm" id="gh-branch" type="text" placeholder="main">
+    </div>
+
     <div id="gh-status" style="font-size:12px;margin-top:10px;min-height:18px;color:var(--text2)"></div>
   </div>
-  <div class="panel-footer">
-    <button class="btn" onclick="closeAllPanels()">Batal</button>
-    <button class="btn amber" onclick="saveGhConfig()">💾 Simpan Config</button>
-    <button class="btn success" onclick="deployToGitHub()">🚀 Deploy Sekarang</button>
+  <div class="panel-footer" id="gh-footer-list">
+    <button class="btn" onclick="closeAllPanels()">Tutup</button>
+  </div>
+  <div class="panel-footer" id="gh-footer-form" style="display:none">
+    <button class="btn" onclick="ghShowTab('list')">Batal</button>
+    <button class="btn amber" onclick="ghSaveConfig()">💾 Simpan</button>
   </div>
 </div>
 
@@ -471,89 +488,130 @@ function doLogout(){
 // ═══════════════════════════════════
 // GITHUB DEPLOY
 // ═══════════════════════════════════
-var KEY_GH = 'kodedit_gh_config';
+var KEY_GH = 'kodedit_gh_configs';
 
-function loadGhConfig(){
-  try{
-    var raw = localStorage.getItem(KEY_GH);
-    if(!raw) return;
-    var c = JSON.parse(raw);
-    document.getElementById('gh-token').value = c.token||'';
-    document.getElementById('gh-repo').value = c.repo||'';
-    document.getElementById('gh-path').value = c.path||'';
-    document.getElementById('gh-branch').value = c.branch||'main';
-    document.getElementById('gh-msg').value = c.msg||'Update via KodEdit';
-  }catch(e){}
+function ghGetConfigs(){
+  try{ return JSON.parse(localStorage.getItem(KEY_GH)||'[]'); }catch(e){ return []; }
+}
+function ghSaveConfigs(list){
+  localStorage.setItem(KEY_GH, JSON.stringify(list));
 }
 
-function saveGhConfig(){
-  var config = {
-    token: document.getElementById('gh-token').value.trim(),
-    repo: document.getElementById('gh-repo').value.trim(),
-    path: document.getElementById('gh-path').value.trim(),
-    branch: document.getElementById('gh-branch').value.trim()||'main',
-    msg: document.getElementById('gh-msg').value.trim()||'Update via KodEdit'
-  };
-  if(!config.token||!config.repo||!config.path){
-    showNotif('Isi Token, Repo dan Path dahulu','err'); return;
+function ghShowTab(tab){
+  var isList = tab==='list';
+  document.getElementById('gh-list-view').style.display = isList?'block':'none';
+  document.getElementById('gh-form-view').style.display = isList?'none':'block';
+  document.getElementById('gh-footer-list').style.display = isList?'flex':'none';
+  document.getElementById('gh-footer-form').style.display = isList?'none':'flex';
+  document.getElementById('gh-tab-list').classList.toggle('active', isList);
+  document.getElementById('gh-tab-form').classList.toggle('active', !isList);
+  document.getElementById('gh-status').textContent='';
+  if(isList) ghRenderList();
+}
+
+function ghRenderList(){
+  var list = ghGetConfigs();
+  var el = document.getElementById('gh-apps-list');
+  if(!list.length){
+    el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app lagi. Tambah app baru.</div>';
+    return;
   }
-  localStorage.setItem(KEY_GH, JSON.stringify(config));
-  showNotif('Config disimpan!','ok');
+  var html='';
+  list.forEach(function(c,i){
+    html+='<div class="file-item" style="flex-wrap:wrap;gap:6px">'+
+      '<div class="file-info" style="width:100%">'+
+        '<div class="file-name">'+c.name+'</div>'+
+        '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
+      '</div>'+
+      '<button class="btn success" style="flex:1;padding:6px" onclick="ghDeploy('+i+')">🚀 Deploy</button>'+
+      '<button class="btn amber" style="flex:none;padding:6px 10px" onclick="ghEditConfig('+i+')">✏</button>'+
+      '<button class="btn danger" style="flex:none;padding:6px 10px" onclick="ghDeleteConfig('+i+')">🗑</button>'+
+    '</div>';
+  });
+  el.innerHTML=html;
 }
 
-function deployToGitHub(){
-  var token = document.getElementById('gh-token').value.trim();
-  var repo = document.getElementById('gh-repo').value.trim();
-  var path = document.getElementById('gh-path').value.trim();
-  var branch = document.getElementById('gh-branch').value.trim()||'main';
-  var msg = document.getElementById('gh-msg').value.trim()||'Update via KodEdit';
-  var status = document.getElementById('gh-status');
-  var content = inp().value;
+function ghNewConfig(){
+  document.getElementById('gh-edit-idx').value='-1';
+  document.getElementById('gh-name').value='';
+  document.getElementById('gh-token').value='';
+  document.getElementById('gh-repo').value='';
+  document.getElementById('gh-path').value='';
+  document.getElementById('gh-branch').value='main';
+}
 
-  if(!token||!repo||!path){showNotif('Isi Token, Repo dan Path dahulu','err');return;}
+function ghEditConfig(idx){
+  var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
+  document.getElementById('gh-edit-idx').value=idx;
+  document.getElementById('gh-name').value=c.name||'';
+  document.getElementById('gh-token').value=c.token||'';
+  document.getElementById('gh-repo').value=c.repo||'';
+  document.getElementById('gh-path').value=c.path||'';
+  document.getElementById('gh-branch').value=c.branch||'main';
+  ghShowTab('form');
+}
+
+function ghDeleteConfig(idx){
+  var list=ghGetConfigs();
+  if(!confirm('Padam config "'+list[idx].name+'"?')) return;
+  list.splice(idx,1); ghSaveConfigs(list);
+  ghRenderList(); showNotif('Config dipadam','ok');
+}
+
+function ghSaveConfig(){
+  var name=document.getElementById('gh-name').value.trim();
+  var token=document.getElementById('gh-token').value.trim();
+  var repo=document.getElementById('gh-repo').value.trim();
+  var path=document.getElementById('gh-path').value.trim();
+  var branch=document.getElementById('gh-branch').value.trim()||'main';
+  if(!name||!token||!repo||!path){showNotif('Isi semua field','err');return;}
+  var list=ghGetConfigs();
+  var idx=parseInt(document.getElementById('gh-edit-idx').value);
+  var config={name:name,token:token,repo:repo,path:path,branch:branch};
+  if(idx>=0) list[idx]=config; else list.push(config);
+  ghSaveConfigs(list);
+  showNotif('Config disimpan!','ok');
+  ghShowTab('list');
+}
+
+function ghDeploy(idx){
+  var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
+  var content=inp().value;
   if(!content){showNotif('Tiada kandungan untuk deploy','err');return;}
-
+  var status=document.getElementById('gh-status');
   status.style.color='var(--accent)';
-  status.textContent='⏳ Mendapatkan SHA fail semasa...';
+  status.textContent='⏳ Deploy "'+c.name+'" — mendapat SHA...';
 
-  var apiUrl = 'https://api.github.com/repos/'+repo+'/contents/'+path;
-  var headers = {
-    'Authorization': 'token '+token,
-    'Accept': 'application/vnd.github.v3+json',
-    'Content-Type': 'application/json'
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path;
+  var headers={
+    'Authorization':'token '+c.token,
+    'Accept':'application/vnd.github.v3+json',
+    'Content-Type':'application/json'
   };
 
-  // Dapatkan SHA fail semasa (diperlukan untuk update)
-  fetch(apiUrl+'?ref='+branch, {headers: headers})
-    .then(function(r){ return r.json(); })
+  fetch(apiUrl+'?ref='+c.branch,{headers:headers})
+    .then(function(r){return r.json();})
     .then(function(data){
-      var sha = data.sha || null;
+      var sha=data.sha||null;
       status.textContent='⏳ Menghantar fail...';
-
-      var body = {
-        message: msg,
-        content: btoa(unescape(encodeURIComponent(content))),
-        branch: branch
+      var body={
+        message:'Update '+c.path+' via KodEdit',
+        content:btoa(unescape(encodeURIComponent(content))),
+        branch:c.branch
       };
-      if(sha) body.sha = sha;
-
-      return fetch(apiUrl, {
-        method: 'PUT',
-        headers: headers,
-        body: JSON.stringify(body)
-      });
+      if(sha) body.sha=sha;
+      return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)});
     })
-    .then(function(r){ return r.json(); })
+    .then(function(r){return r.json();})
     .then(function(data){
       if(data.content){
         status.style.color='var(--green)';
-        status.textContent='✓ Berjaya deploy: '+path+' → '+branch;
-        showNotif('🚀 Deploy berjaya!','ok');
-        saveGhConfig();
-      } else if(data.message){
+        status.textContent='✓ Deploy berjaya: '+c.name+' → '+c.branch;
+        showNotif('🚀 '+c.name+' berjaya deploy!','ok');
+      } else {
         status.style.color='var(--red)';
-        status.textContent='✕ '+data.message;
-        showNotif('Deploy gagal: '+data.message,'err');
+        status.textContent='✕ '+(data.message||'Gagal');
+        showNotif('Deploy gagal: '+(data.message||''),'err');
       }
     })
     .catch(function(e){
@@ -1174,7 +1232,7 @@ function openPanel(id){
     document.getElementById(id).classList.add('open');
     document.getElementById('overlay').classList.add('show');
     if(id==='files-panel') renderFilesBody();
-    if(id==='github-panel') loadGhConfig();
+if(id==='github-panel') ghShowTab('list');
     if(id==='replace-panel'){
       document.getElementById('replace-preview').style.display='none';
       setTimeout(function(){document.getElementById('replace-find').focus();},350);
