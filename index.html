@@ -189,7 +189,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="top-btn" onclick="triggerUpload()" title="Upload">⬆</button>
     <button class="top-btn green" onclick="backupToFirebase()" title="Simpan ke Firebase">☁</button>
     <button class="top-btn accent" onclick="downloadFile()" title="Download">⬇</button>
-    <button class="top-btn" onclick="previewHTML()" title="Preview">👁</button>
+    <button class="top-btn" onclick="previewHTML()" title="Preview" style="width:auto;padding:0 10px;font-size:13px">👁 Preview</button>
     <button class="top-btn" onclick="doLogout()" title="Log Keluar" style="font-size:13px">↩</button>
   </div>
 
@@ -937,7 +937,12 @@ function renderFilesBody(){
       files.forEach(function(f){
         var sz=f.size>1024?Math.round(f.size/1024)+' KB':f.size+' B';
         var isActive=f.name===S.fileName;
-        html+='<div class="file-item'+(isActive?' active-file':'')+'"><span class="file-icon">☁</span><div class="file-info"><div class="file-name">'+f.name+'</div><div class="file-meta">'+sz+'</div></div><button class="file-act" onclick="loadCloudFile(\''+f.name+'\')">Buka</button><button class="file-act" style="border-color:var(--amber);color:var(--amber)" onclick="renameCloudFile(\''+f.name+'\')">✏</button><button class="file-del" onclick="deleteCloudFile(\''+f.name+'\')">🗑</button></div>';
+        var dt='';
+        if(f.updatedAt&&f.updatedAt.toDate){
+          var d=f.updatedAt.toDate();
+          dt=' · '+d.toLocaleDateString('ms-MY')+' '+d.toLocaleTimeString('ms-MY',{hour:'2-digit',minute:'2-digit',hour12:true});
+        }
+        html+='<div class="file-item'+(isActive?' active-file':'')+'"><span class="file-icon">☁</span><div class="file-info"><div class="file-name">'+f.name+'</div><div class="file-meta">'+sz+dt+'</div></div><button class="file-act" onclick="loadCloudFile(\''+f.name+'\')">Buka</button><button class="file-act" style="border-color:var(--amber);color:var(--amber)" onclick="renameCloudFile(\''+f.name+'\')">✏</button><button class="file-del" onclick="deleteCloudFile(\''+f.name+'\')">🗑</button></div>';
       });
       body.innerHTML=html;
     });
