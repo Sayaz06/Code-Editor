@@ -938,6 +938,37 @@ function ghCheckStatus(idx){
     });
 }
 
+function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds){
+  var body={
+    message:'Update '+c.path+' via KodEdit',
+    content:btoa(unescape(encodeURIComponent(content))),
+    branch:c.branch
+  };
+  if(sha) body.sha=sha;
+  fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(data.content){
+        status.style.color='var(--green)';
+        status.textContent='✓ Deploy berjaya: '+c.name+' → '+c.branch;
+        showNotif('🚀 '+c.name+' berjaya deploy!','ok');
+        if(ds){ ds.style.color='var(--amber)'; ds.textContent='⏳ GitHub Pages sedang build... tekan 🔍 untuk check'; }
+        setTimeout(function(){ ghCheckStatus(idx); }, 30000);
+      } else {
+        status.style.color='var(--red)';
+        status.textContent='✕ '+(data.message||'Gagal');
+        showNotif('Deploy gagal: '+(data.message||''),'err');
+        if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ Deploy gagal'; }
+      }
+    })
+    .catch(function(e){
+      status.style.color='var(--red)';
+      status.textContent='✕ Error: '+e.message;
+      showNotif('Deploy gagal','err');
+      if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
+    });
+}
+
 function ghDeploy(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
   var token=ghGetToken();
@@ -947,7 +978,7 @@ function ghDeploy(idx){
   var status=document.getElementById('gh-status');
   var ds=document.getElementById('gh-ds-'+idx);
   status.style.color='var(--accent)';
-  status.textContent='⏳ Deploy "'+c.name+'" — mendapat SHA...';
+  status.textContent='⏳ Deploy "'+c.name+'" — mendapat SHA terkini...';
   if(ds){ ds.style.color='var(--accent)'; ds.textContent='⏳ Deploying...'; }
 
   var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path;
@@ -962,35 +993,12 @@ function ghDeploy(idx){
     .then(function(data){
       var sha=data.sha||null;
       status.textContent='⏳ Menghantar fail...';
-      var body={
-        message:'Update '+c.path+' via KodEdit',
-        content:btoa(unescape(encodeURIComponent(content))),
-        branch:c.branch
-      };
-      if(sha) body.sha=sha;
-      return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)});
-    })
-    .then(function(r){return r.json();})
-    .then(function(data){
-      if(data.content){
-        status.style.color='var(--green)';
-        status.textContent='✓ Deploy berjaya: '+c.name+' → '+c.branch;
-        showNotif('🚀 '+c.name+' berjaya deploy!','ok');
-        if(ds){ ds.style.color='var(--amber)'; ds.textContent='⏳ GitHub Pages sedang build... tekan 🔍 untuk check'; }
-        // auto check selepas 30 saat
-        setTimeout(function(){ ghCheckStatus(idx); }, 30000);
-      } else {
-        status.style.color='var(--red)';
-        status.textContent='✕ '+(data.message||'Gagal');
-        showNotif('Deploy gagal: '+(data.message||''),'err');
-        if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ Deploy gagal'; }
-      }
+      ghDoActualDeploy(apiUrl,headers,content,sha,c,status,ds);
     })
     .catch(function(e){
       status.style.color='var(--red)';
       status.textContent='✕ Error: '+e.message;
       showNotif('Deploy gagal','err');
-      if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
     });
 }
 
