@@ -1016,7 +1016,20 @@ function previewHTML(){
   var tab=window.open(url,'_blank');
   if(!tab){showNotif('Benarkan popup untuk preview','err');return;}
   setTimeout(function(){URL.revokeObjectURL(url);},10000);
-  showNotif('Preview dibuka!','ok');
+  if(currentUser&&S.fileName){
+    fbCollection().doc(S.fileName).set({
+      name:S.fileName,
+      content:content,
+      updatedAt:firebase.firestore.FieldValue.serverTimestamp(),
+      size:content.length
+    }).then(function(){
+      showNotif('Preview dibuka + disimpan ke Firebase','ok');
+    }).catch(function(){
+      showNotif('Preview dibuka (gagal simpan)','err');
+    });
+  } else {
+    showNotif('Preview dibuka!','ok');
+  }
 }
 
 // DRAG DROP
