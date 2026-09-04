@@ -644,12 +644,14 @@ function ghRenderList(){
   }
   var html='';
   list.forEach(function(c,i){
-    html+='<div class="file-item" style="flex-wrap:wrap;gap:6px">'+
+    html+='<div class="file-item" style="flex-wrap:wrap;gap:6px" id="gh-item-'+i+'">'+
       '<div class="file-info" style="width:100%">'+
         '<div class="file-name">'+c.name+'</div>'+
         '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
+        '<div class="gh-deploy-status" id="gh-ds-'+i+'" style="font-size:11px;margin-top:4px;min-height:14px"></div>'+
       '</div>'+
       '<button class="btn success" style="flex:1;padding:6px" onclick="ghDeploy('+i+')">🚀 Deploy</button>'+
+      '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--accent);color:var(--accent)" onclick="ghCheckStatus('+i+')">🔍</button>'+
       '<button class="btn amber" style="flex:none;padding:6px 10px" onclick="ghEditConfig('+i+')">✏</button>'+
       '<button class="btn danger" style="flex:none;padding:6px 10px" onclick="ghDeleteConfig('+i+')">🗑</button>'+
     '</div>';
@@ -703,6 +705,49 @@ function ghSaveConfig(){
   }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
 }
 
+function ghCheckStatus(idx){
+  var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
+  var token=ghGetToken();
+  if(!token){showNotif('Simpan API Key dahulu','err');return;}
+  var ds=document.getElementById('gh-ds-'+idx);
+  if(ds){ ds.style.color='var(--accent)'; ds.textContent='⏳ Checking...'; }
+  var headers={
+    'Authorization':'token '+token,
+    'Accept':'application/vnd.github.v3+json'
+  };
+  fetch('https://api.github.com/repos/'+c.repo+'/pages/builds',{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!ds) return;
+      if(Array.isArray(data)&&data.length){
+        var latest=data[0];
+        var st=latest.status;
+        if(st==='built'){
+          ds.style.color='var(--green)';
+          ds.textContent='✓ Pages dah live';
+        } else if(st==='building'){
+          ds.style.color='var(--amber)';
+          ds.textContent='⏳ Sedang build... tekan 🔍 semula';
+        } else if(st==='errored'){
+          ds.style.color='var(--red)';
+          ds.textContent='✕ Build error: '+(latest.error&&latest.error.message||'unknown');
+        } else {
+          ds.style.color='var(--text2)';
+          ds.textContent='Status: '+st;
+        }
+      } else if(data.message){
+        ds.style.color='var(--red)';
+        ds.textContent='✕ '+data.message;
+      } else {
+        ds.style.color='var(--text2)';
+        ds.textContent='Tiada data build';
+      }
+    })
+    .catch(function(e){
+      if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
+    });
+}
+
 function ghDeploy(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
   var token=ghGetToken();
@@ -710,8 +755,10 @@ function ghDeploy(idx){
   var content=inp().value;
   if(!content){showNotif('Tiada kandungan untuk deploy','err');return;}
   var status=document.getElementById('gh-status');
+  var ds=document.getElementById('gh-ds-'+idx);
   status.style.color='var(--accent)';
   status.textContent='⏳ Deploy "'+c.name+'" — mendapat SHA...';
+  if(ds){ ds.style.color='var(--accent)'; ds.textContent='⏳ Deploying...'; }
 
   var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path;
   var headers={
@@ -739,16 +786,21 @@ function ghDeploy(idx){
         status.style.color='var(--green)';
         status.textContent='✓ Deploy berjaya: '+c.name+' → '+c.branch;
         showNotif('🚀 '+c.name+' berjaya deploy!','ok');
+        if(ds){ ds.style.color='var(--amber)'; ds.textContent='⏳ GitHub Pages sedang build... tekan 🔍 untuk check'; }
+        // auto check selepas 30 saat
+        setTimeout(function(){ ghCheckStatus(idx); }, 30000);
       } else {
         status.style.color='var(--red)';
         status.textContent='✕ '+(data.message||'Gagal');
         showNotif('Deploy gagal: '+(data.message||''),'err');
+        if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ Deploy gagal'; }
       }
     })
     .catch(function(e){
       status.style.color='var(--red)';
       status.textContent='✕ Error: '+e.message;
       showNotif('Deploy gagal','err');
+      if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
     });
 }
 
