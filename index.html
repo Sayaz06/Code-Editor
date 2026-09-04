@@ -323,7 +323,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div id="gh-list-view">
       <div id="gh-deploy-original" style="display:none;margin-bottom:10px;padding:10px;background:rgba(6,214,160,0.1);border:1px solid rgba(6,214,160,0.3);border-radius:8px">
         <div style="font-size:12px;color:var(--green);margin-bottom:6px" id="gh-original-info"></div>
-        <button class="btn success" style="width:100%" onclick="ghDeployOriginal()">🚀 Deploy to Original Path</button>
+        <div style="display:flex;gap:6px">
+          <button class="btn success" id="btn-deploy-orig" style="flex:1" onclick="ghDeployOriginal()">🚀 Deploy to Original Path</button>
+          <button class="btn" style="flex:none;padding:6px 10px;border-color:var(--accent);color:var(--accent)" onclick="ghCheckOrigStatus()">🔍</button>
+        </div>
+        <div id="gh-orig-status" style="font-size:11px;margin-top:6px;min-height:14px"></div>
       </div>
       <div id="gh-apps-list"></div>
       <div style="text-align:center;margin-top:8px">
@@ -783,15 +787,69 @@ function ghBrowseOpen(path){
     .catch(function(e){ showNotif('Gagal: '+e.message,'err'); });
 }
 
+function ghSetOrigBlock(blocked){
+  if(!currentUser) return;
+  S.origDeployBlocked=blocked;
+  var btn=document.getElementById('btn-deploy-orig');
+  var ds=document.getElementById('gh-orig-status');
+  if(btn){
+    btn.disabled=blocked;
+    btn.style.opacity=blocked?'0.5':'1';
+    btn.style.cursor=blocked?'not-allowed':'pointer';
+  }
+  if(ds){
+    ds.style.color=blocked?'var(--amber)':'var(--green)';
+    ds.textContent=blocked?'⏳ Menunggu Pages build... tekan 🔍 untuk check':'';
+  }
+  // simpan state dalam Firebase
+  if(currentUser){
+    db.collection('users').doc(currentUser.uid).collection('settings').doc('deployState').set({
+      origBlocked: blocked,
+      origPath: S.filePath,
+      origRepo: S.fileRepo,
+      origBranch: S.fileBranch
+    }).catch(function(){});
+  }
+}
+
+function ghCheckOrigStatus(){
+  if(!S.fileRepo||!S.fileBranch) return;
+  var token=ghGetToken();
+  if(!token) return;
+  var ds=document.getElementById('gh-orig-status');
+  if(ds){ ds.style.color='var(--accent)'; ds.textContent='⏳ Checking...'; }
+  var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'};
+  fetch('https://api.github.com/repos/'+S.fileRepo+'/pages/builds',{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!ds) return;
+      if(Array.isArray(data)&&data.length){
+        var st=data[0].status;
+        if(st==='built'){
+          ds.style.color='var(--green)'; ds.textContent='✓ Pages dah live';
+          ghSetOrigBlock(false);
+        } else if(st==='building'){
+          ds.style.color='var(--amber)'; ds.textContent='⏳ Sedang build... tekan 🔍 semula';
+        } else if(st==='errored'){
+          ds.style.color='var(--red)'; ds.textContent='✕ Build error';
+          ghSetOrigBlock(false);
+        }
+      }
+    }).catch(function(){});
+}
+
 function ghDeployOriginal(){
   if(!S.filePath||!S.fileRepo){showNotif('Tiada fail GitHub dibuka','err');return;}
+  if(S.origDeployBlocked){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
   var token=ghGetToken();
   if(!token){showNotif('Simpan API Key dahulu','err');return;}
   var content=inp().value;
   if(!content){showNotif('Tiada kandungan','err');return;}
   var status=document.getElementById('gh-status');
+  var ds=document.getElementById('gh-orig-status');
   status.style.color='var(--accent)';
   status.textContent='⏳ Deploy ke '+S.filePath+'...';
+  if(ds){ ds.style.color='var(--accent)'; ds.textContent='⏳ Deploying...'; }
   var apiUrl='https://api.github.com/repos/'+S.fileRepo+'/contents/'+S.filePath;
   var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
   fetch(apiUrl+'?ref='+S.fileBranch,{headers:headers})
@@ -807,13 +865,20 @@ function ghDeployOriginal(){
         status.style.color='var(--green)';
         status.textContent='✓ Deploy berjaya: '+S.filePath;
         showNotif('🚀 Deploy berjaya!','ok');
+        ghSetOrigBlock(true);
+        setTimeout(function(){ ghCheckOrigStatus(); }, 30000);
       } else {
         status.style.color='var(--red)';
         status.textContent='✕ '+(data.message||'Gagal');
         showNotif('Deploy gagal','err');
+        ghSetOrigBlock(false);
       }
     })
-    .catch(function(e){ status.style.color='var(--red)'; status.textContent='✕ '+e.message; showNotif('Deploy gagal','err'); });
+    .catch(function(e){
+      status.style.color='var(--red)'; status.textContent='✕ '+e.message;
+      showNotif('Deploy gagal','err');
+      ghSetOrigBlock(false);
+    });
 }
 
 function ghRenderList(){
@@ -1155,6 +1220,7 @@ function closeFile(){
 // ═══════════════════════════════════
 var S = {
   fileName:'',filePath:'',fileRepo:'',fileBranch:'',
+  origDeployBlocked:false,
   undoStack:[],redoStack:[],
   selStart:-1,selEnd:-1,selMode:false,
   searchResults:[],searchIdx:0,currentTab:'cloud',
