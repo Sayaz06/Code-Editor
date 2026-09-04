@@ -328,6 +328,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
           <button class="btn" style="flex:none;padding:6px 10px;border-color:var(--accent);color:var(--accent)" onclick="ghCheckOrigStatus()">🔍</button>
         </div>
         <div id="gh-orig-status" style="font-size:11px;margin-top:6px;min-height:14px"></div>
+        <div id="gh-orig-lock-note" style="display:none;font-size:11px;margin-top:4px;color:var(--amber);font-style:italic">⚠ Deployment in progress — all deploy buttons are locked to prevent SHA conflicts. Press 🔍 to check build status.</div>
       </div>
       <div id="gh-apps-list"></div>
       <div style="text-align:center;margin-top:8px">
@@ -933,6 +934,7 @@ function ghRenderList(){
         '<div class="file-name">'+c.name+'</div>'+
         '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
         '<div class="gh-deploy-status" id="gh-ds-'+i+'" style="font-size:11px;margin-top:4px;min-height:14px">'+(blocked?'⏳ Menunggu Pages build...':'')+'</div>'+
+        (blocked?'<div style="font-size:10px;color:var(--amber);font-style:italic;margin-top:2px">⚠ Deployment in progress — locked to prevent SHA conflicts. Press 🔍 to check.</div>':'')+
       '</div>'+
       '<button class="btn success" style="flex:1;padding:6px;opacity:'+(blocked?'0.5':'1')+';cursor:'+(blocked?'not-allowed':'pointer')+'" onclick="ghDeploy('+i+')" '+(blocked?'disabled':'')+'>🚀 Deploy</button>'+
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="ghBrowse('+i+')">📂</button>'+
@@ -1051,6 +1053,8 @@ function ghSetGlobalLock(locked){
     origBtn.style.opacity=locked?'0.5':'1';
     origBtn.style.cursor=locked?'not-allowed':'pointer';
   }
+  var lockNote=document.getElementById('gh-orig-lock-note');
+  if(lockNote) lockNote.style.display=locked?'block':'none';
   // simpan ke Firestore
   if(currentUser){
     ghFbDoc().update({globalLock: locked}).catch(function(){
