@@ -665,8 +665,15 @@ function ghLoadFromFirebase(callback){
       _ghToken = d.token||'';
       _ghConfigs = d.configs||[];
       _ghGlobalLock = d.globalLock||false;
-      // restore UI lock
-      if(_ghGlobalLock) setTimeout(function(){ ghSetGlobalLock(true); },500);
+      if(_ghGlobalLock){
+        var anyBlocked=_ghConfigs.some(function(c){ return c.deployBlocked; });
+        if(!anyBlocked){
+          _ghGlobalLock=false;
+          ghFbDoc().update({globalLock:false}).catch(function(){});
+        } else {
+          setTimeout(function(){ ghSetGlobalLock(true); },500);
+        }
+      }
     }
     if(callback) callback();
   }).catch(function(){ if(callback) callback(); });
