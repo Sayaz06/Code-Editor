@@ -289,6 +289,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     </div>
     <div id="rp-bulk-view" style="display:none">
       <div class="storage-note">Tampal output AI dalam format:<br><strong>Cari:</strong><br>[kod lama]<br><strong>Ganti:</strong><br>[kod baru]<br><br>Boleh ada banyak blok berturutan.</div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:6px">
+        <button class="tool-btn" onclick="pasteToBulk()" style="padding:4px 12px">📋 Paste</button>
+      </div>
       <textarea class="field" id="bulk-input" rows="10" placeholder="Tampal semua blok Cari/Ganti di sini..." oninput="liveBulkPreview()"></textarea>
       <div id="bulk-status" style="font-size:12px;margin-top:8px;min-height:18px;color:var(--text2)"></div>
     </div>
@@ -489,11 +492,18 @@ function loadFileFromFirebase(doc){
   if(doc.inStorage){
     showNotif('Memuatkan dari Firebase Storage...','info');
     var ref = storage.ref(fbStoragePath(doc.name));
-    return ref.getDownloadURL().then(function(url){
-      return fetch(url).then(function(r){
-        if(!r.ok) throw new Error('Gagal muat dari Storage');
-        return r.text();
-      });
+    return new Promise(function(resolve, reject){
+      ref.getDownloadURL().then(function(url){
+        var xhr = new XMLHttpRequest();
+        xhr.responseType = 'text';
+        xhr.onload = function(){
+          if(xhr.status===200) resolve(xhr.response);
+          else reject(new Error('HTTP '+xhr.status));
+        };
+        xhr.onerror = function(){ reject(new Error('XHR error')); };
+        xhr.open('GET', url);
+        xhr.send();
+      }).catch(reject);
     });
   } else {
     return Promise.resolve(doc.content||'');
@@ -1320,6 +1330,16 @@ var _bulkTimer=null;
 function clearBulk(){
   document.getElementById('bulk-input').value='';
   document.getElementById('bulk-status').textContent='';
+}
+
+function pasteToBulk(){
+  navigator.clipboard.readText().then(function(text){
+    if(!text){showNotif('Clipboard kosong','err');return;}
+    document.getElementById('bulk-input').value=text;
+    document.getElementById('bulk-status').textContent='';
+    liveBulkPreview();
+    showNotif('Ditampal!','ok');
+  }).catch(function(){showNotif('Benarkan akses clipboard','err');});
 }
 
 function liveBulkPreview(){
