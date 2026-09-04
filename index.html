@@ -816,6 +816,7 @@ function ghBrowseOpen(path){
 function ghSetOrigBlock(blocked){
   if(!currentUser) return;
   S.origDeployBlocked=blocked;
+  if(blocked) S.origDeployTime=Date.now();
   var btn=document.getElementById('btn-deploy-orig');
   var ds=document.getElementById('gh-orig-status');
   if(btn){
@@ -866,15 +867,25 @@ function ghCheckOrigStatus(){
     .then(function(data){
       if(!ds) return;
       if(Array.isArray(data)&&data.length){
-        var st=data[0].status;
+        var latest=data[0];
+        var st=latest.status;
+        var updatedAt=latest.updated_at?new Date(latest.updated_at):null;
+        var deployTime=S.origDeployTime||0;
         if(st==='built'){
-          ds.style.color='var(--green)'; ds.textContent='✓ Pages dah live';
-          ghSetOrigBlock(false);
+          // pastikan build ni adalah untuk deploy terkini
+          if(!S.origDeployBlocked){
+            ds.style.color='var(--green)'; ds.textContent='✓ Pages dah live';
+          } else if(updatedAt&&updatedAt.getTime()>deployTime){
+            ds.style.color='var(--green)'; ds.textContent='✓ Pages dah live';
+            ghSetOrigBlock(false);
+          } else {
+            ds.style.color='var(--amber)'; ds.textContent='⏳ Menunggu build baru... tekan 🔍 semula';
+          }
         } else if(st==='building'){
           ds.style.color='var(--amber)'; ds.textContent='⏳ Sedang build... tekan 🔍 semula';
         } else if(st==='errored'){
           ds.style.color='var(--red)'; ds.textContent='✕ Build error';
-          ghSetOrigBlock(false);
+          if(S.origDeployBlocked) ghSetOrigBlock(false);
         } else {
           ds.style.color='var(--text2)'; ds.textContent='Status: '+st;
         }
@@ -1304,7 +1315,7 @@ function closeFile(){
 // ═══════════════════════════════════
 var S = {
   fileName:'',filePath:'',fileRepo:'',fileBranch:'',
-  origDeployBlocked:false,
+  origDeployBlocked:false,origDeployTime:0,
   undoStack:[],redoStack:[],
   selStart:-1,selEnd:-1,selMode:false,
   searchResults:[],searchIdx:0,currentTab:'cloud',
