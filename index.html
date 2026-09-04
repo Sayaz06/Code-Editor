@@ -671,7 +671,23 @@ function ghLoadFromFirebase(callback){
           _ghGlobalLock=false;
           ghFbDoc().update({globalLock:false}).catch(function(){});
         } else {
-          setTimeout(function(){ ghSetGlobalLock(true); },500);
+          // auto check semua app yg blocked
+          setTimeout(function(){
+            ghSetGlobalLock(true);
+            _ghConfigs.forEach(function(c,i){
+              if(!c.deployBlocked) return;
+              var token=_ghToken;
+              if(!token) return;
+              fetch('https://api.github.com/repos/'+c.repo+'/pages/builds',{
+                headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
+              }).then(function(r){return r.json();})
+              .then(function(data){
+                if(Array.isArray(data)&&data.length&&data[0].status==='built'){
+                  ghSetDeployBlock(i,false);
+                }
+              }).catch(function(){});
+            });
+          },1000);
         }
       }
     }
