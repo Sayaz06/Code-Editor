@@ -317,7 +317,15 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
         <button class="tool-btn" onclick="pasteToBulk()" style="padding:4px 12px">📋 Paste</button>
       </div>
       <textarea class="field" id="bulk-input" rows="10" placeholder="Tampal semua blok Cari/Ganti di sini..." oninput="liveBulkPreview()"></textarea>
-      <div id="bulk-status" style="font-size:12px;margin-top:8px;min-height:18px;color:var(--text2)"></div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px">
+        <div id="bulk-status" style="font-size:12px;flex:1;min-height:18px;color:var(--text2)"></div>
+        <button class="tool-btn" id="btn-bulk-log" onclick="showBulkLog()" style="padding:4px 10px;display:none;border-color:var(--amber);color:var(--amber)">📋 Log AI</button>
+      </div>
+      <div id="bulk-log-area" style="display:none;margin-top:10px">
+        <div class="field-label">Preset untuk AI — salin dan tampal ke AI</div>
+        <textarea class="field" id="bulk-log-text" rows="8" readonly style="font-size:11px;color:var(--text2)"></textarea>
+        <button class="btn" onclick="copyBulkLog()" style="margin-top:6px">📋 Salin Log</button>
+      </div>
     </div>
   </div>
   <div class="panel-footer" id="rp-footer-single">
@@ -1911,34 +1919,102 @@ function liveBulkPreview(){
   _bulkTimer=setTimeout(_liveBulkPreview,400);
 }
 
+var _bulkNotFound=[];
+
 function _liveBulkPreview(){
   var raw=document.getElementById('bulk-input').value;
   var status=document.getElementById('bulk-status');
-  if(!raw.trim()){status.textContent='';return;}
+  var btnLog=document.getElementById('btn-bulk-log');
+  var logArea=document.getElementById('bulk-log-area');
+  _bulkNotFound=[];
+  if(!raw.trim()){status.textContent='';btnLog.style.display='none';return;}
   var pairs=parseBulkInput(raw);
   if(!pairs.length){
     status.style.color='var(--text2)';
     status.textContent='Tiada blok Cari/Ganti dijumpai';
+    btnLog.style.display='none';
     return;
   }
   var content=inp().value;
   var jumpa=0,tidakJumpa=0;
   pairs.forEach(function(p){
     var found=flexFind(content,p.find);
-    if(found.length) jumpa++; else tidakJumpa++;
+    if(found.length){ jumpa++; }
+    else { tidakJumpa++; _bulkNotFound.push(p.find); }
   });
   var msg='';
   if(jumpa&&!tidakJumpa){
     status.style.color='var(--green)';
     msg='✓ '+jumpa+' blok dijumpai';
+    btnLog.style.display='none';
+    logArea.style.display='none';
   } else if(jumpa&&tidakJumpa){
     status.style.color='var(--amber)';
     msg='✓ '+jumpa+' blok dijumpai  |  ✕ '+tidakJumpa+' blok tidak selaras';
+    btnLog.style.display='block';
   } else {
     status.style.color='var(--red)';
     msg='✕ '+tidakJumpa+' blok tidak dijumpai';
+    btnLog.style.display='block';
   }
   status.textContent=msg;
+}
+
+function findSimilarCode(findTxt){
+  var content=inp().value;
+  var cLines=content.split('\n');
+  var qLines=findTxt.split('\n').map(nws).filter(function(l){return l.length>0;});
+  if(!qLines.length) return '';
+  // ambil keyword unik dari baris tengah blok
+  var midLine=qLines[Math.floor(qLines.length/2)];
+  var keyword=midLine.split(/\s+/).filter(function(w){return w.length>4;})[0]||midLine.substring(0,20);
+  keyword=keyword.toLowerCase();
+  // cari baris yang paling mirip
+  var bestScore=-1, bestLine=-1;
+  cLines.forEach(function(line,idx){
+    var norm=nws(line).toLowerCase();
+    var score=0;
+    qLines.forEach(function(q){
+      if(norm.includes(q.substring(0,Math.min(q.length,15)).toLowerCase())) score++;
+    });
+    if(norm.includes(keyword)) score+=2;
+    if(score>bestScore){bestScore=score;bestLine=idx;}
+  });
+  if(bestLine<0||bestScore===0) return '';
+  // ambil kawasan sekeliling — dari mula blok serupa hingga akhir
+  var start=Math.max(0,bestLine-3);
+  var end=Math.min(cLines.length-1,bestLine+qLines.length+3);
+  var result='';
+  for(var i=start;i<=end;i++){
+    result+=(i+1)+': '+cLines[i]+'\n';
+  }
+  return result;
+}
+
+function showBulkLog(){
+  var logArea=document.getElementById('bulk-log-area');
+  var logText=document.getElementById('bulk-log-text');
+  logArea.style.display='block';
+  var txt='The following code blocks could not be found in the file:\n\n';
+  _bulkNotFound.forEach(function(block,i){
+    txt+='--- Block '+(i+1)+' ---\n'+block+'\n\n';
+  });
+  txt+='Here is the section of code in my app that appears similar to the blocks above:\n\n';
+  _bulkNotFound.forEach(function(block,i){
+    var similar=findSimilarCode(block);
+    if(similar){
+      txt+='--- Similar to Block '+(i+1)+' ---\n'+similar+'\n';
+    }
+  });
+  txt+='---\n\nPlease review the file I have provided line by line carefully to ensure you do not generate an incorrect solution.';
+  logText.value=txt;
+}
+
+function copyBulkLog(){
+  var logText=document.getElementById('bulk-log-text');
+  navigator.clipboard.writeText(logText.value).then(function(){
+    showNotif('Log disalin!','ok');
+  }).catch(function(){showNotif('Gagal salin','err');});
 }
 
 function parseBulkInput(raw){
