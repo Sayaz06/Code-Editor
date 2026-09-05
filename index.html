@@ -1982,8 +1982,8 @@ function findSimilarCode(findTxt){
   });
   if(bestLine<0||bestScore===0) return '';
   // ambil kawasan sekeliling — dari mula blok serupa hingga akhir
-  var start=Math.max(0,bestLine-3);
-  var end=Math.min(cLines.length-1,bestLine+qLines.length+3);
+var start=Math.max(0,bestLine-5);
+  var end=Math.min(cLines.length-1,bestLine+qLines.length+5);
   var result='';
   for(var i=start;i<=end;i++){
     result+=(i+1)+': '+cLines[i]+'\n';
