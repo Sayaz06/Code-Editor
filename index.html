@@ -1904,7 +1904,7 @@ function previewReplace(){
   var withTxt=document.getElementById('replace-with').value;
   var div=document.getElementById('replace-preview');
   if(!findTxt){showNotif('Isi teks untuk dicari','err');return;}
-  var found=flexFind(inp().value,findTxt);
+  var found=flexFind(_getEditContent(),findTxt);
   if(!found.length){showNotif('Teks tidak dijumpai','err');div.style.display='none';return;}
   document.getElementById('preview-old').textContent=found[0].origLines.join('\n');
   document.getElementById('preview-new').textContent=withTxt;
@@ -1984,6 +1984,16 @@ function liveBulkPreview(){
 
 var _bulkNotFound=[];
 
+function _getEditContent(){
+  if(_multiMode){
+    if(_multiTarget>=0&&_multiFiles[_multiTarget]&&_multiFiles[_multiTarget].loaded)
+      return _multiFiles[_multiTarget].content;
+    var mf=_multiFiles.find(function(m){return m.loaded;});
+    return mf?mf.content:'';
+  }
+  return inp().value;
+}
+
 function _liveBulkPreview(){
   var raw=document.getElementById('bulk-input').value;
   var status=document.getElementById('bulk-status');
@@ -1998,7 +2008,7 @@ function _liveBulkPreview(){
     btnLog.style.display='none';
     return;
   }
-  var content=inp().value;
+  var content=_getEditContent();
   var jumpa=0,tidakJumpa=0;
   pairs.forEach(function(p){
     var found=flexFind(content,p.find);
@@ -2024,7 +2034,7 @@ function _liveBulkPreview(){
 }
 
 function findSimilarCode(findTxt){
-  var content=inp().value;
+  var content=_getEditContent();
   var cLines=content.split('\n');
   var qLines=findTxt.split('\n').map(nws).filter(function(l){return l.length>0;});
   if(!qLines.length) return '';
