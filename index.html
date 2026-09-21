@@ -2295,7 +2295,7 @@ function toggleMultiMode(){
     selBar.classList.remove('show');ftWrap.classList.remove('show');
     mPanel.style.display='flex';
     closeAllPanels();
-    if(currentUser){ghLoadFromFirebase(function(){multiRender();});}
+    if(currentUser){ghLoadFromFirebase(function(){if(_multiFiles.length===0)multiLoadList();else multiRender();});}
     else{multiRender();}
   } else {
     btn.style.background='';btn.style.color='';btn.style.borderColor='';
@@ -2649,7 +2649,7 @@ function toggleMultiMode(){
     if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';btn.style.background='rgba(76,201,240,0.15)';}
     _multiTarget=-1;
     closeAllPanels();
-    if(currentUser){ghLoadFromFirebase(function(){multiRender();});}
+    if(currentUser){ghLoadFromFirebase(function(){if(_multiFiles.length===0)multiLoadList();else multiRender();});}
     else{multiRender();}
   } else {
     panel.style.display='none';
@@ -2713,6 +2713,7 @@ function multiAddApp(configIdx){
   multiRenderPicker();
   multiRender();
   multiLoadFile(_multiFiles.length-1);
+  multiSaveList();
 }
 
 function multiRemoveApp(i){
@@ -2720,6 +2721,33 @@ function multiRemoveApp(i){
   _multiFiles.splice(i,1);
   if(_multiTarget>=_multiFiles.length) _multiTarget=-1;
   multiRender();
+  multiSaveList();
+}
+
+function multiSaveList(){
+  if(!currentUser) return;
+  var apps=_multiFiles.map(function(mf){return {name:mf.config.name,repo:mf.config.repo,path:mf.config.path,branch:mf.config.branch};});
+  db.collection('users').doc(currentUser.uid).collection('multiMode').doc('apps').set({apps:apps}).catch(function(){});
+}
+
+function multiLoadList(){
+  if(!currentUser) return;
+  var configs=ghGetConfigs();
+  db.collection('users').doc(currentUser.uid).collection('multiMode').doc('apps').get()
+    .then(function(doc){
+      if(!doc.exists){multiRender();return;}
+      var saved=doc.data().apps||[];
+      saved.forEach(function(s){
+        var already=_multiFiles.some(function(mf){return mf.config.repo===s.repo&&mf.config.path===s.path;});
+        if(already) return;
+        var idx=-1;
+        configs.forEach(function(cv,ci){if(cv.repo===s.repo&&cv.path===s.path)idx=ci;});
+        var cfg=idx>=0?configs[idx]:s;
+        _multiFiles.push({configIdx:idx,config:cfg,content:'',loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
+      });
+      multiRender();
+      _multiFiles.forEach(function(mf,i){if(!mf.loaded)multiLoadFile(i);});
+    }).catch(function(){multiRender();});
 }
 
 function multiLoadFile(i){
@@ -2822,6 +2850,7 @@ function multiRenderItemHTML(i){
       '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
       '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
       '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
+      '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>👁 Preview</button>'+
     '</div>'+
   '</div>';
 }
@@ -2847,6 +2876,16 @@ function multiRefreshOne(i){
   mf.loaded=false; mf.status='⏳ Memuatkan semula...'; mf.statusType='info';
   multiRenderItem(i);
   multiLoadFile(i);
+}
+
+function multiPreviewOne(i){
+  var mf=_multiFiles[i]; if(!mf||!mf.loaded){showNotif('Fail belum dimuatkan','err');return;}
+  var blob=new Blob([mf.content],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var tab=window.open(url,'_blank');
+  if(!tab){showNotif('Benarkan popup untuk preview','err');return;}
+  setTimeout(function(){URL.revokeObjectURL(url);},10000);
+  showNotif('👁 Preview '+mf.config.name+' dibuka!','ok');
 }
 
 function multiCheckStatus(i){
