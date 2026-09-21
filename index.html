@@ -2710,10 +2710,10 @@ function multiAddApp(configIdx){
   var c=configs[configIdx];
   if(!c) return;
   _multiFiles.push({configIdx:configIdx,config:c,content:'',loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
-  multiRenderPicker();
   multiRender();
   multiLoadFile(_multiFiles.length-1);
   multiSaveList();
+  hideMultiPicker();
 }
 
 function multiRemoveApp(i){
