@@ -2823,6 +2823,7 @@ function multiRenderItemHTML(i){
       '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
       '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
       '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
+      '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
       '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
       '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
     '</div>'+
@@ -2850,6 +2851,30 @@ function multiRefreshOne(i){
   mf.loaded=false; mf.status='⏳ Memuatkan semula...'; mf.statusType='info';
   multiRenderItem(i);
   multiLoadFile(i);
+}
+
+function multiCheckStatus(i){
+  var mf=_multiFiles[i]; if(!mf) return;
+  var c=mf.config;
+  var token=ghGetToken();
+  if(!token){showNotif('Simpan API Key dahulu','err');return;}
+  mf.status='🔍 Checking Pages...'; mf.statusType='info';
+  multiRenderItem(i);
+  fetch('https://api.github.com/repos/'+c.repo+'/pages/builds',{
+    headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
+  }).then(function(r){return r.json();})
+  .then(function(data){
+    if(Array.isArray(data)&&data.length){
+      var st=data[0].status;
+      if(st==='built'){mf.status='✓ Pages dah live';mf.statusType='ok';}
+      else if(st==='building'){mf.status='⏳ Sedang build...';mf.statusType='info';}
+      else if(st==='errored'){mf.status='✕ Build error';mf.statusType='err';}
+      else{mf.status='Status: '+st;mf.statusType='info';}
+    } else {
+      mf.status='Pages: tiada data';mf.statusType='info';
+    }
+    multiRenderItem(i);
+  }).catch(function(e){mf.status='✕ '+e.message;mf.statusType='err';multiRenderItem(i);});
 }
 
 var _fpCardIdx=-1;
