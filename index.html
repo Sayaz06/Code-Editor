@@ -2665,8 +2665,12 @@ function toggleMultiMode(){
 function showMultiPicker(){
   var picker=document.getElementById('multi-picker');
   if(!picker) return;
-  multiRenderPicker();
-  picker.style.display='block';
+  if(currentUser&&!ghGetConfigs().length){
+    ghLoadFromFirebase(function(){multiRenderPicker();picker.style.display='block';});
+  } else {
+    multiRenderPicker();
+    picker.style.display='block';
+  }
 }
 
 function hideMultiPicker(){
