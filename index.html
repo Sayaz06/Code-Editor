@@ -2655,12 +2655,8 @@ function toggleMultiMode(){
 function showMultiPicker(){
   var picker=document.getElementById('multi-picker');
   if(!picker) return;
-  if(currentUser&&!ghGetConfigs().length){
-    ghLoadFromFirebase(function(){multiRenderPicker();picker.style.display='block';});
-  } else {
-    multiRenderPicker();
-    picker.style.display='block';
-  }
+  multiRenderPicker();
+  picker.style.display='block';
 }
 
 function hideMultiPicker(){
@@ -2810,6 +2806,7 @@ function multiRenderItemHTML(i){
   var isTarget=_multiTarget===i;
   var sc=mf.statusType==='ok'?'var(--green)':mf.statusType==='err'?'var(--red)':'var(--amber)';
   var fname=c.path.split('/').pop();
+  var _rp=c.repo.split('/');var _ghBase='https://'+_rp[0]+'.github.io/'+_rp[1]+'/';var _ghFile=_ghBase+c.path;
   return '<div class="multi-app-card" id="multi-card-'+i+'" style="'+(isTarget?'border-color:var(--accent);':'')+'">'+
     '<div class="multi-app-top">'+
       '<div class="multi-app-info">'+
@@ -2826,6 +2823,8 @@ function multiRenderItemHTML(i){
       '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
       '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
       '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
+      '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
+      '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
     '</div>'+
   '</div>';
 }
