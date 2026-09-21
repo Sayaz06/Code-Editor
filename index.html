@@ -180,6 +180,26 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 
 /* UNHIGHLIGHT BAR */
 #unhighlight-bar{display:none;padding:8px 14px;background:rgba(6,214,160,0.1);border-top:1px solid rgba(6,214,160,0.3);flex-shrink:0}
+
+/* MULTI MODE */
+#multi-panel{display:none;flex-direction:column;flex:1;overflow:hidden;min-height:0}
+#multi-list{flex:1;overflow-y:auto;padding:10px;display:flex;flex-direction:column;gap:8px}
+.multi-app-card{background:var(--surface2);border-radius:10px;border:1px solid var(--border);padding:10px 12px}
+.multi-app-top{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px}
+.multi-app-icon{font-size:20px;flex-shrink:0;margin-top:2px}
+.multi-app-info{flex:1;min-width:0}
+.multi-app-name{font-size:13px;font-weight:600;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.multi-app-meta{font-size:11px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.multi-app-status{font-size:11px;margin-top:4px;min-height:16px}
+.multi-app-btns{display:flex;gap:6px;flex-wrap:wrap}
+#multi-bottom{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--surface2);border-top:1px solid var(--border);flex-wrap:wrap;flex-shrink:0}
+#multi-target-info{display:none;background:rgba(123,47,247,0.15);border:1px solid rgba(123,47,247,0.4);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--accent2);margin-bottom:10px}
+.picker-item{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--surface2);border-radius:8px;margin-bottom:6px;border:1px solid var(--border)}
+.picker-item .file-info{flex:1;min-width:0}
+.fp-item{padding:9px 12px;background:var(--surface2);border-radius:8px;margin-bottom:6px;border:1px solid var(--border);font-size:13px;cursor:pointer;color:var(--text);display:flex;align-items:center;gap:6px}
+.fp-item:active{border-color:var(--accent);color:var(--accent)}
+.fp-item.fp-dir{color:var(--amber);border-color:rgba(255,209,102,0.3)}
+.fp-item.fp-back{color:var(--accent);border-color:rgba(76,201,240,0.3)}
 </style>
 </head>
 <body>
@@ -212,6 +232,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="top-btn accent" onclick="downloadFile()" title="Download">⬇</button>
 <button class="top-btn" onclick="previewHTML()" title="Preview" style="width:auto;padding:0 10px;font-size:13px">👁 Preview</button>
     <button class="top-btn" onclick="openPanel('github-panel')" title="Deploy ke GitHub" style="width:auto;padding:0 10px;font-size:13px;border-color:rgba(255,255,255,0.3);color:var(--text)">🚀 Deploy</button>
+    <button class="top-btn" id="btn-multi" onclick="toggleMultiMode()" title="Mode Edit Berbilang" style="width:auto;padding:0 10px;font-size:13px;border-color:rgba(123,47,247,0.5);color:var(--text2)">⊞ Berbilang</button>
 
   </div>
 
@@ -273,12 +294,52 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     </div>
   </div>
 
+  <!-- MULTI PANEL -->
+  <div id="multi-panel" style="display:none;flex-direction:column;flex:1;overflow:hidden">
+    <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface)">
+      <span style="font-size:14px;font-weight:600;color:var(--accent);flex:1">⊞ Mode Edit Berbilang</span>
+      <span id="multi-count" style="font-size:11px;color:var(--text2)">0 app</span>
+      <button class="tool-btn" onclick="toggleMultiMode()" style="padding:0 10px;height:28px;font-size:11px;border-color:var(--red);color:var(--red)">✕ Tutup</button>
+    </div>
+    <div id="multi-empty" style="display:none;padding:40px 20px;text-align:center;color:var(--text2);font-size:13px">
+      <div style="font-size:40px;margin-bottom:12px">📱</div>
+      <div style="font-weight:600;color:var(--text);margin-bottom:6px;font-size:15px">Tiada app dibuka</div>
+      <div style="margin-bottom:16px">Tekan ➕ Tambah App untuk pilih app</div>
+      <button class="btn primary" onclick="showMultiPicker()" style="max-width:200px;margin:0 auto">➕ Tambah App</button>
+    </div>
+    <div id="multi-list" style="flex:1;overflow-y:auto;padding:10px"></div>
+    <div id="multi-picker" style="background:var(--surface3);border-top:2px solid var(--border);padding:12px;flex-shrink:0;display:none;max-height:45vh;overflow-y:auto">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">
+        <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">Pilih App untuk Tambah</span>
+        <button class="tool-btn" onclick="hideMultiPicker()" style="padding:0 8px;height:26px;font-size:11px">✕</button>
+      </div>
+      <div id="multi-picker-list"></div>
+    </div>
+    <div style="padding:10px;border-top:1px solid var(--border);display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0">
+      <button class="btn" onclick="showMultiPicker()" style="flex:none;padding:8px 12px">➕ Tambah</button>
+      <button class="btn" onclick="multiSetTarget(-1);rpShowTab('bulk');openPanel('replace-panel')" style="flex:1">⚡ Ganti Semua</button>
+      <button class="btn success" onclick="multiDeployAll()" style="flex:1">🚀 Deploy Semua</button>
+      <button class="btn" onclick="multiDownloadAll()" style="flex:1;background:var(--accent2);border-color:var(--accent2);color:#fff">⬇ DL Semua</button>
+    </div>
+  </div>
+
   <!-- STATUS BAR -->
   <div id="statusbar">
     <span id="status-file">Tiada fail</span>
     <span id="status-fb"></span>
     <span id="status-pos">B:1 L:1</span>
     <span id="status-sel" style="color:var(--amber)"></span>
+  </div>
+</div>
+
+<!-- MULTI FILE PICKER -->
+<div id="multi-filepick" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:110;display:none;align-items:flex-end" onclick="if(event.target===this)hideFilePicker()">
+  <div style="background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:72vh;display:flex;flex-direction:column">
+    <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1" id="filepick-title">Pilih Fail</span>
+      <button class="tool-btn" onclick="hideFilePicker()" style="padding:0 8px;height:26px;font-size:11px">✕ Tutup</button>
+    </div>
+    <div style="padding:8px;overflow-y:auto;flex:1" id="filepick-list"></div>
   </div>
 </div>
 
@@ -294,6 +355,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="nav-tab" id="rp-tab-bulk" onclick="rpShowTab('bulk')" style="flex:1">⚡ Ganti Pukal</div>
   </div>
   <div class="panel-body">
+    <div id="multi-target-info"></div>
     <div id="rp-single-view">
       <div class="field-label">Cari kod ini (boleh multiline, space tidak ketat)</div>
       <textarea class="field" id="replace-find" rows="4" placeholder="Tampal kod lama di sini..." oninput="liveHighlight()"></textarea>
@@ -1850,6 +1912,7 @@ function previewReplace(){
   div.style.display='block';
 }
 function doReplace(){
+  if(_multiMode){multiDoReplace();return;}
   var findTxt=document.getElementById('replace-find').value;
   var withTxt=document.getElementById('replace-with').value;
   var el=inp();
@@ -2038,6 +2101,7 @@ function parseBulkInput(raw){
 }
 
 function doBulkReplace(){
+  if(_multiMode){multiDoBulkReplace();return;}
   var raw=document.getElementById('bulk-input').value;
   var status=document.getElementById('bulk-status');
   if(!raw.trim()){showNotif('Tampal blok Cari/Ganti dahulu','err');return;}
@@ -2198,6 +2262,810 @@ function restoreBackup(idx){
   pushUndo(); S.fileName=b.name; inp().value=b.content;
   updateAll(); saveToStorage(); closeAllPanels();
   showNotif('Backup dipulihkan!','ok');
+}
+
+// ═══════════════════════════════════
+// MULTI MODE
+// ═══════════════════════════════════
+var _multiMode=false;
+var _multiFiles=[];
+var _multiTarget=-1; // -1=semua, >=0=app tertentu
+
+function toggleMultiMode(){
+  _multiMode=!_multiMode;
+  var btn=document.getElementById('btn-multi');
+  var edWrap=document.getElementById('editor-wrap');
+  var tbWrap=document.getElementById('toolbar-wrap');
+  var mPanel=document.getElementById('multi-panel');
+  var selBar=document.getElementById('sel-bar');
+  var ftWrap=document.getElementById('filetree-wrap');
+  if(_multiMode){
+    btn.style.background='var(--accent2)';btn.style.color='#fff';btn.style.borderColor='var(--accent2)';
+    edWrap.style.display='none';tbWrap.style.display='none';
+    selBar.classList.remove('show');ftWrap.classList.remove('show');
+    mPanel.style.display='flex';
+    closeAllPanels();
+    if(currentUser){ghLoadFromFirebase(function(){multiRender();});}
+    else{multiRender();}
+  } else {
+    btn.style.background='';btn.style.color='';btn.style.borderColor='';
+    edWrap.style.display='';tbWrap.style.display='';
+    mPanel.style.display='none';_multiTarget=-1;
+    var info=document.getElementById('multi-target-info');
+    if(info){info.style.display='none';info.textContent='';}
+  }
+}
+
+function multiSetTarget(i){
+  _multiTarget=i;
+  var info=document.getElementById('multi-target-info');
+  if(!info)return;
+  if(i===-1){
+    info.style.display='none';info.textContent='';
+  } else {
+    var mf=_multiFiles[i];
+    info.style.display='block';
+    info.textContent='⊞ Sasaran: '+(mf?mf.config.name:'App '+(i+1))+' sahaja';
+  }
+}
+
+function multiLoadAll(){
+  var configs=ghGetConfigs();
+  var list=document.getElementById('multi-list');
+  if(!configs.length){
+    list.innerHTML='<div style="text-align:center;color:var(--text2);padding:30px;font-size:13px">Tiada app dikonfigurasi.<br>Tambah app dalam panel 🚀 Deploy dahulu.</div>';
+    return;
+  }
+  _multiFiles=configs.map(function(c,i){
+    return {configIdx:i,config:c,fileName:c.path.split('/').pop(),
+      content:'',loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false};
+  });
+  multiRender();
+  _multiFiles.forEach(function(mf,i){multiLoadFile(i);});
+}
+
+function multiLoadFile(i){
+  var mf=_multiFiles[i];
+  if(!currentUser)return;
+  fbCollection().doc(mf.fileName).get().then(function(doc){
+    if(doc.exists){
+      return loadFileFromFirebase(doc.data()).then(function(content){
+        _multiFiles[i].content=content;_multiFiles[i].loaded=true;
+        _multiFiles[i].status='✓ Firebase · '+(content.length>1024?Math.round(content.length/1024)+'KB':content.length+'B');
+        _multiFiles[i].statusType='ok';multiRenderItem(i);
+      });
+    } else {multiLoadFromGH(i);}
+  }).catch(function(){multiLoadFromGH(i);});
+}
+
+function multiLoadFromGH(i){
+  var mf=_multiFiles[i],c=mf.config,token=ghGetToken();
+  _multiFiles[i].status='⏳ Cuba dari GitHub...';_multiFiles[i].statusType='info';multiRenderItem(i);
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path+'?ref='+c.branch;
+  var headers={'Accept':'application/vnd.github.v3+json'};
+  if(token)headers['Authorization']='token '+token;
+  fetch(apiUrl,{headers:headers}).then(function(r){return r.json();})
+    .then(function(data){
+      function setC(content){
+        _multiFiles[i].content=content;_multiFiles[i].loaded=true;
+        _multiFiles[i].status='✓ GitHub · '+(content.length>1024?Math.round(content.length/1024)+'KB':content.length+'B');
+        _multiFiles[i].statusType='ok';multiRenderItem(i);
+      }
+      if(data.content){
+        try{setC(decodeURIComponent(escape(atob(data.content.replace(/\n/g,'')))));}
+        catch(e){if(data.download_url)fetch(data.download_url).then(function(r){return r.text();}).then(setC);}
+      } else if(data.download_url){
+        fetch(data.download_url).then(function(r){return r.text();}).then(setC);
+      } else {
+        _multiFiles[i].status='✕ '+(data.message||'Gagal — tambah GitHub Token');
+        _multiFiles[i].statusType='err';multiRenderItem(i);
+      }
+    }).catch(function(e){_multiFiles[i].status='✕ '+e.message;_multiFiles[i].statusType='err';multiRenderItem(i);});
+}
+
+function multiRender(){
+  var list=document.getElementById('multi-list');
+  var empty=document.getElementById('multi-empty');
+  var count=document.getElementById('multi-count');
+  if(!list) return;
+  if(count) count.textContent=_multiFiles.length+' app';
+  if(!_multiFiles.length){
+    if(empty) empty.style.display='block';
+    list.innerHTML=''; return;
+  }
+  if(empty) empty.style.display='none';
+  var html='';
+  _multiFiles.forEach(function(mf,i){
+    var sc=mf.statusType==='ok'?'var(--green)':mf.statusType==='err'?'var(--red)':'var(--accent)';
+    var isTgt=_multiTarget===i;
+    html+=
+      '<div class="multi-app-card" id="multi-card-'+i+'" style="'+(isTgt?'border-color:var(--accent);':'')+'">'+
+        '<div class="multi-app-top">'+
+          '<div class="multi-app-info">'+
+            '<div class="multi-app-name">'+(isTgt?'🎯 ':'')+mf.config.name+'</div>'+
+            '<div class="multi-app-meta">'+mf.config.repo+' → '+mf.config.path+'</div>'+
+            '<div class="multi-app-status" id="multi-status-'+i+'" style="color:'+sc+'">'+mf.status+'</div>'+
+          '</div>'+
+          '<button class="tool-btn" onclick="multiRemoveApp('+i+')" style="flex-shrink:0;padding:0 8px;height:26px;font-size:11px;border-color:var(--red);color:var(--red)">✕</button>'+
+        '</div>'+
+        '<div class="multi-app-btns">'+
+          '<button class="tool-btn" onclick="multiSetTarget('+i+');openPanel(\'replace-panel\');rpShowTab(\'single\')" style="padding:4px 10px;font-size:11px">🔄 Ganti</button>'+
+          '<button class="tool-btn" onclick="multiSetTarget('+i+');openPanel(\'replace-panel\');rpShowTab(\'bulk\')" style="padding:4px 10px;font-size:11px;border-color:var(--accent2);color:var(--accent2)">⚡ Ganti Pukal</button>'+
+          '<button class="tool-btn" onclick="multiDeployOne('+i+')" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">🚀 Deploy</button>'+
+          '<button class="tool-btn" onclick="multiDownloadOne('+i+')" style="padding:4px 10px;font-size:11px">⬇ DL</button>'+
+          '<button class="tool-btn" onclick="multiLoadFromGH('+i+')" style="padding:4px 8px;font-size:11px;border-color:var(--amber);color:var(--amber)">↺ GH</button>'+
+        '</div>'+
+      '</div>';
+  });
+  list.innerHTML=html;
+}
+
+function multiRenderItem(i){
+  var mf=_multiFiles[i];
+  var st=document.getElementById('multi-status-'+i);
+  if(!st){multiRender();return;}
+  var sc=mf.statusType==='ok'?'var(--green)':mf.statusType==='err'?'var(--red)':'var(--accent)';
+  st.style.color=sc;st.textContent=mf.status;
+}
+
+function multiRemoveApp(i){
+  if(!confirm('Keluarkan "'+_multiFiles[i].config.name+'" dari senarai?')) return;
+  _multiFiles.splice(i,1);
+  if(_multiTarget>=_multiFiles.length) _multiTarget=-1;
+  multiRender();
+}
+
+function showMultiPicker(){
+  var picker=document.getElementById('multi-picker');
+  if(!picker) return;
+  if(currentUser&&!ghGetToken()){ghLoadFromFirebase(function(){multiRenderPicker();});}
+  else{multiRenderPicker();}
+  picker.style.display='block';
+}
+
+function hideMultiPicker(){
+  var picker=document.getElementById('multi-picker');
+  if(picker) picker.style.display='none';
+}
+
+function multiRenderPicker(){
+  var list=document.getElementById('multi-picker-list');
+  if(!list) return;
+  var configs=ghGetConfigs();
+  if(!configs.length){
+    list.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app dalam Deploy. Tambah dulu dalam 🚀 Deploy.</div>';
+    return;
+  }
+  var addedIdxs=_multiFiles.map(function(mf){return mf.configIdx;});
+  var html='';
+  configs.forEach(function(c,i){
+    var isAdded=addedIdxs.indexOf(i)>=0;
+    html+='<div class="picker-item">'+
+      '<div class="file-info">'+
+        '<div class="file-name">'+c.name+'</div>'+
+        '<div class="file-meta">'+c.repo+' → '+c.path+'</div>'+
+      '</div>'+
+      '<button class="file-act" '+(isAdded?'disabled style="opacity:0.4;cursor:not-allowed"':'')+
+        ' onclick="multiAddApp('+i+')">'+(isAdded?'✓ Ada':'Tambah')+'</button>'+
+    '</div>';
+  });
+  list.innerHTML=html;
+}
+
+function multiAddApp(configIdx){
+  var already=_multiFiles.some(function(mf){return mf.configIdx===configIdx;});
+  if(already){showNotif('App sudah ada dalam senarai','info');return;}
+  var configs=ghGetConfigs();
+  var c=configs[configIdx]; if(!c) return;
+  _multiFiles.push({configIdx:configIdx,config:c,fileName:c.path.split('/').pop(),
+    content:'',loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
+  multiRenderPicker();
+  multiRender();
+  multiLoadFile(_multiFiles.length-1);
+}
+
+function multiDoReplace(){
+  var findTxt=document.getElementById('replace-find').value;
+  var withTxt=document.getElementById('replace-with').value;
+  if(!findTxt){showNotif('Isi teks untuk dicari','err');return;}
+  var targets=_multiTarget===-1
+    ?_multiFiles.filter(function(mf){return mf.loaded;})
+    :(_multiFiles[_multiTarget]&&_multiFiles[_multiTarget].loaded?[_multiFiles[_multiTarget]]:[]);
+  if(!targets.length){showNotif('Tiada app dimuatkan','err');return;}
+  var totalGanti=0;
+  targets.forEach(function(mf){
+    var found=flexFind(mf.content,findTxt);if(!found.length)return;
+    var cLines=mf.content.split('\n'),offset=0;
+    found.forEach(function(r){
+      var s=r.startLine-offset,e=r.endLine-offset,rep=withTxt.split('\n');
+      cLines=cLines.slice(0,s).concat(rep).concat(cLines.slice(e+1));
+      offset+=(r.endLine-r.startLine+1)-rep.length;
+    });
+    mf.content=cLines.join('\n');totalGanti+=found.length;
+    var idx=_multiFiles.indexOf(mf);
+    _multiFiles[idx].status='✓ '+found.length+' gantian';_multiFiles[idx].statusType='ok';
+    multiRenderItem(idx);
+    if(currentUser)saveFileToFirebase(mf.fileName,mf.content).catch(function(){});
+  });
+  showNotif(totalGanti+' gantian pada '+(targets.length>1?targets.length+' app':targets[0].config.name)+'!','ok');
+  closeAllPanels();
+}
+
+function multiDoBulkReplace(){
+  var raw=document.getElementById('bulk-input').value;
+  var status=document.getElementById('bulk-status');
+  if(!raw.trim()){showNotif('Isi blok Cari/Ganti dahulu','err');return;}
+  var pairs=parseBulkInput(raw);
+  if(!pairs.length){showNotif('Format tidak betul','err');return;}
+  var targets=_multiTarget===-1
+    ?_multiFiles.filter(function(mf){return mf.loaded;})
+    :(_multiFiles[_multiTarget]&&_multiFiles[_multiTarget].loaded?[_multiFiles[_multiTarget]]:[]);
+  if(!targets.length){showNotif('Tiada app dimuatkan atau tiada sasaran','err');return;}
+  var totalGanti=0;
+  targets.forEach(function(mf){
+    var content=mf.content,fileGanti=0,fileTidak=0;
+    pairs.forEach(function(p){
+      var found=flexFind(content,p.find);
+      if(!found.length){fileTidak++;return;}
+      var cLines=content.split('\n'),offset=0;
+      found.forEach(function(r){
+        var s=r.startLine-offset,e=r.endLine-offset,rep=p.with.split('\n');
+        cLines=cLines.slice(0,s).concat(rep).concat(cLines.slice(e+1));
+        offset+=(r.endLine-r.startLine+1)-rep.length;
+      });
+      content=cLines.join('\n');fileGanti+=found.length;
+    });
+    mf.content=content;totalGanti+=fileGanti;
+    var idx=_multiFiles.indexOf(mf);
+    _multiFiles[idx].status=fileGanti>0?'✓ '+fileGanti+' gantian'+(fileTidak?' | ✕ '+fileTidak+' tak jumpa':''):'✕ Tiada gantian dijumpai';
+    _multiFiles[idx].statusType=fileGanti>0?'ok':'err';
+    multiRenderItem(idx);
+    if(currentUser&&fileGanti>0)saveFileToFirebase(mf.fileName,mf.content).catch(function(){});
+  });
+  if(status){
+    status.style.color='var(--green)';
+    status.textContent='✓ '+totalGanti+' gantian pada '+(targets.length>1?targets.length+' app':targets[0].config.name);
+  }
+  showNotif(totalGanti+' gantian berjaya!','ok');
+  closeAllPanels();
+}
+
+function multiDeployOne(i){
+  var mf=_multiFiles[i];
+  if(!mf||!mf.loaded){showNotif('Fail belum dimuatkan — tekan ↺ GH','err');return;}
+  var token=ghGetToken();if(!token){showNotif('Simpan API Key dahulu','err');return;}
+  var c=mf.config;
+  _multiFiles[i].status='⏳ Deploying...';_multiFiles[i].statusType='info';
+  _multiFiles[i].deploying=true;multiRenderItem(i);
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path;
+  var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  fetch(apiUrl+'?ref='+c.branch,{headers:headers}).then(function(r){return r.json();})
+    .then(function(data){
+      var body={message:'Update '+c.path+' via KodEdit',content:btoa(unescape(encodeURIComponent(mf.content))),branch:c.branch};
+      if(data.sha)body.sha=data.sha;
+      return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)});
+    }).then(function(r){return r.json();})
+    .then(function(data){
+      _multiFiles[i].deploying=false;
+      if(data.content){
+        _multiFiles[i].status='🚀 Deploy berjaya!';_multiFiles[i].statusType='ok';
+        showNotif(c.name+' berjaya deploy!','ok');
+      } else {
+        _multiFiles[i].status='✕ '+(data.message||'Gagal');_multiFiles[i].statusType='err';
+        showNotif('Deploy gagal: '+(data.message||''),'err');
+      }
+      multiRenderItem(i);
+    }).catch(function(e){
+      _multiFiles[i].deploying=false;_multiFiles[i].status='✕ '+e.message;
+      _multiFiles[i].statusType='err';multiRenderItem(i);showNotif('Deploy gagal','err');
+    });
+}
+
+function multiDownloadOne(i){
+  var mf=_multiFiles[i];
+  if(!mf||!mf.loaded){showNotif('Fail belum dimuatkan','err');return;}
+  var blob=new Blob([mf.content],{type:'text/plain;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a');a.href=url;a.download=mf.fileName;
+  document.body.appendChild(a);a.click();document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  showNotif('⬇ '+mf.fileName,'ok');
+}
+
+function multiDeployAll(){
+  var loaded=_multiFiles.filter(function(mf){return mf.loaded;});
+  if(!loaded.length){showNotif('Tiada app dimuatkan','err');return;}
+  var token=ghGetToken();if(!token){showNotif('Simpan API Key dahulu','err');return;}
+  if(!confirm('Deploy '+loaded.length+' app ke GitHub serentak?'))return;
+  var i=0;
+  function next(){
+    if(i>=loaded.length){showNotif('Semua '+loaded.length+' app berjaya deploy!','ok');return;}
+    var mf=loaded[i];var idx=_multiFiles.indexOf(mf);i++;
+    var c=mf.config;
+    _multiFiles[idx].status='⏳ Deploying...';_multiFiles[idx].statusType='info';multiRenderItem(idx);
+    var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path;
+    var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+    fetch(apiUrl+'?ref='+c.branch,{headers:headers}).then(function(r){return r.json();})
+      .then(function(data){
+        var body={message:'Update '+c.path+' via KodEdit',content:btoa(unescape(encodeURIComponent(mf.content))),branch:c.branch};
+        if(data.sha)body.sha=data.sha;
+        return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)});
+      }).then(function(r){return r.json();})
+      .then(function(data){
+        if(data.content){_multiFiles[idx].status='🚀 Berjaya!';_multiFiles[idx].statusType='ok';}
+        else{_multiFiles[idx].status='✕ '+(data.message||'Gagal');_multiFiles[idx].statusType='err';}
+        multiRenderItem(idx);setTimeout(next,600);
+      }).catch(function(e){
+        _multiFiles[idx].status='✕ '+e.message;_multiFiles[idx].statusType='err';
+        multiRenderItem(idx);setTimeout(next,600);
+      });
+  }
+  next();
+}
+
+function multiDownloadAll(){
+  var loaded=_multiFiles.filter(function(mf){return mf.loaded;});
+  if(!loaded.length){showNotif('Tiada app dimuatkan','err');return;}
+  var i=0;
+  function dlNext(){
+    if(i>=loaded.length){showNotif(loaded.length+' fail didownload!','ok');return;}
+    var mf=loaded[i++];
+    var blob=new Blob([mf.content],{type:'text/plain;charset=utf-8'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a');a.href=url;a.download=mf.fileName;
+    document.body.appendChild(a);a.click();document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);dlNext();},400);
+  }
+  dlNext();
+}
+
+// ═══════════════════════════════════
+// MULTI MODE
+// ═══════════════════════════════════
+var _multiMode=false;
+var _multiFiles=[];
+var _multiTarget=-1;
+
+function toggleMultiMode(){
+  _multiMode=!_multiMode;
+  var btn=document.getElementById('btn-multi');
+  var panel=document.getElementById('multi-panel');
+  var edWrap=document.getElementById('editor-wrap');
+  var tbWrap=document.getElementById('toolbar-wrap');
+  if(_multiMode){
+    panel.style.display='flex';
+    edWrap.style.display='none';
+    if(tbWrap)tbWrap.style.display='none';
+    if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';btn.style.background='rgba(76,201,240,0.15)';}
+    _multiTarget=-1;
+    closeAllPanels();
+    if(currentUser){ghLoadFromFirebase(function(){multiRender();});}
+    else{multiRender();}
+  } else {
+    panel.style.display='none';
+    edWrap.style.display='';
+    if(tbWrap)tbWrap.style.display='';
+    _multiTarget=-1;
+    if(btn){btn.style.borderColor='';btn.style.color='';btn.style.background='';}
+    var info=document.getElementById('multi-target-info');
+    if(info){info.style.display='none';info.textContent='';}
+  }
+}
+
+function showMultiPicker(){
+  var picker=document.getElementById('multi-picker');
+  if(!picker) return;
+  if(currentUser&&!ghGetConfigs().length){
+    ghLoadFromFirebase(function(){multiRenderPicker();picker.style.display='block';});
+  } else {
+    multiRenderPicker();
+    picker.style.display='block';
+  }
+}
+
+function hideMultiPicker(){
+  var picker=document.getElementById('multi-picker');
+  if(picker) picker.style.display='none';
+}
+
+function multiRenderPicker(){
+  var list=document.getElementById('multi-picker-list');
+  if(!list) return;
+  var configs=ghGetConfigs();
+  if(!configs.length){
+    list.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app dalam Deploy. Tambah dulu dalam 🚀 Deploy.</div>';
+    return;
+  }
+  var addedIdxs=_multiFiles.map(function(mf){return mf.configIdx;});
+  var html='';
+  configs.forEach(function(c,i){
+    var isAdded=addedIdxs.indexOf(i)>=0;
+    html+='<div class="picker-item">'+
+      '<div class="file-info">'+
+        '<div class="file-name">'+c.name+'</div>'+
+        '<div class="file-meta">'+c.repo+' → '+c.path+'</div>'+
+      '</div>'+
+      '<button class="file-act" '+(isAdded?'disabled style="opacity:0.4;cursor:not-allowed"':'')+' onclick="multiAddApp('+i+')">'+
+        (isAdded?'✓ Ada':'Tambah')+
+      '</button>'+
+    '</div>';
+  });
+  list.innerHTML=html;
+}
+
+function multiAddApp(configIdx){
+  var already=_multiFiles.some(function(mf){return mf.configIdx===configIdx;});
+  if(already){showNotif('App sudah ada dalam senarai','info');return;}
+  var configs=ghGetConfigs();
+  var c=configs[configIdx];
+  if(!c) return;
+  _multiFiles.push({configIdx:configIdx,config:c,content:'',loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
+  multiRenderPicker();
+  multiRender();
+  multiLoadFile(_multiFiles.length-1);
+}
+
+function multiRemoveApp(i){
+  if(!confirm('Keluarkan "'+_multiFiles[i].config.name+'" dari senarai?')) return;
+  _multiFiles.splice(i,1);
+  if(_multiTarget>=_multiFiles.length) _multiTarget=-1;
+  multiRender();
+}
+
+function multiLoadFile(i){
+  var mf=_multiFiles[i]; if(!mf) return;
+  var c=mf.config;
+  if(currentUser){
+    var fileName=c.path.split('/').pop();
+    fbCollection().doc(fileName).get()
+      .then(function(doc){
+        if(doc.exists){
+          return loadFileFromFirebase(doc.data()).then(function(content){
+            _multiFiles[i].content=content;
+            _multiFiles[i].loaded=true;
+            _multiFiles[i].status='✓ Dimuat dari Firebase';
+            _multiFiles[i].statusType='ok';
+            multiRenderItem(i);
+          });
+        } else {
+          return multiLoadFromGH(i);
+        }
+      })
+      .catch(function(){ multiLoadFromGH(i); });
+  } else {
+    multiLoadFromGH(i);
+  }
+}
+
+function multiLoadFromGH(i){
+  var mf=_multiFiles[i]; if(!mf) return;
+  var c=mf.config;
+  var token=ghGetToken();
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path+'?ref='+c.branch;
+  var headers={'Accept':'application/vnd.github.v3+json'};
+  if(token) headers['Authorization']='token '+token;
+  fetch(apiUrl,{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      function setContent(content){
+        _multiFiles[i].content=content;
+        _multiFiles[i].loaded=true;
+        _multiFiles[i].status='✓ Dimuat dari GitHub';
+        _multiFiles[i].statusType='ok';
+        multiRenderItem(i);
+      }
+      if(data.content){
+        try{
+          setContent(decodeURIComponent(escape(atob(data.content.replace(/\n/g,'')))));
+        }catch(e){
+          if(data.download_url){
+            fetch(data.download_url).then(function(r){return r.text();}).then(setContent);
+          } else {
+            _multiFiles[i].status='✕ Gagal decode';
+            _multiFiles[i].statusType='err';
+            multiRenderItem(i);
+          }
+        }
+      } else if(data.download_url){
+        fetch(data.download_url).then(function(r){return r.text();}).then(setContent);
+      } else {
+        _multiFiles[i].status='✕ '+(data.message||'Gagal muat');
+        _multiFiles[i].statusType='err';
+        multiRenderItem(i);
+      }
+    })
+    .catch(function(e){
+      _multiFiles[i].status='✕ '+e.message;
+      _multiFiles[i].statusType='err';
+      multiRenderItem(i);
+    });
+}
+
+function multiRender(){
+  var list=document.getElementById('multi-list');
+  var empty=document.getElementById('multi-empty');
+  var count=document.getElementById('multi-count');
+  if(!list) return;
+  if(count) count.textContent=_multiFiles.length+' app';
+  if(!_multiFiles.length){
+    if(empty) empty.style.display='block';
+    list.innerHTML='';
+    return;
+  }
+  if(empty) empty.style.display='none';
+  var html='';
+  _multiFiles.forEach(function(mf,i){ html+=multiRenderItemHTML(i); });
+  list.innerHTML=html;
+}
+
+function multiRenderItem(i){
+  var el=document.getElementById('multi-card-'+i);
+  if(el) el.outerHTML=multiRenderItemHTML(i);
+  else multiRender();
+}
+
+function multiRenderItemHTML(i){
+  var mf=_multiFiles[i];
+  var c=mf.config;
+  var isTarget=_multiTarget===i;
+  var sc=mf.statusType==='ok'?'var(--green)':mf.statusType==='err'?'var(--red)':'var(--amber)';
+  var fname=c.path.split('/').pop();
+  return '<div class="multi-app-card" id="multi-card-'+i+'" style="'+(isTarget?'border-color:var(--accent);':'')+'">'+
+    '<div class="multi-app-top">'+
+      '<div class="multi-app-info">'+
+        '<div class="multi-app-name">'+(isTarget?'🎯 ':'')+c.name+'</div>'+
+        '<div class="multi-app-meta">'+c.repo+' · <span style="color:var(--accent)">'+fname+'</span></div>'+
+        '<div class="multi-app-status" style="color:'+sc+'">'+mf.status+'</div>'+
+      '</div>'+
+      '<button class="tool-btn" onclick="multiRemoveApp('+i+')" style="flex-shrink:0;padding:0 8px;height:26px;font-size:11px;border-color:var(--red);color:var(--red)">✕</button>'+
+    '</div>'+
+    '<div class="multi-app-btns">'+
+      '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'single\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>🔄 Ganti</button>'+
+      '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⚡ Ganti Pukal</button>'+
+      '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
+      '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
+      '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
+      '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
+    '</div>'+
+  '</div>';
+}
+
+function multiSetTarget(i){
+  _multiTarget=i;
+  var info=document.getElementById('multi-target-info');
+  if(info){
+    if(i===-1){
+      info.style.display=(_multiMode&&_multiFiles.length)?'block':'none';
+      info.textContent='🎯 Ganti Pukal → Semua App yang dimuat ('+_multiFiles.filter(function(m){return m.loaded;}).length+')';
+    } else {
+      var mf=_multiFiles[i];
+      info.style.display='block';
+      info.textContent='🎯 Sasaran: '+(mf?mf.config.name:'App '+(i+1));
+    }
+  }
+  multiRender();
+}
+
+function multiRefreshOne(i){
+  var mf=_multiFiles[i]; if(!mf) return;
+  mf.loaded=false; mf.status='⏳ Memuatkan semula...'; mf.statusType='info';
+  multiRenderItem(i);
+  multiLoadFile(i);
+}
+
+var _fpCardIdx=-1;
+function multiSwitchFile(i){
+  _fpCardIdx=i;
+  var mf=_multiFiles[i]; if(!mf) return;
+  var dir=mf.config.path.indexOf('/')>=0?mf.config.path.substring(0,mf.config.path.lastIndexOf('/')):'';
+  var title=document.getElementById('filepick-title');
+  if(title)title.textContent='📂 '+mf.config.name+' — pilih fail';
+  showFilePicker();
+  fpBrowse(i,dir);
+}
+function showFilePicker(){
+  var el=document.getElementById('multi-filepick');
+  if(el)el.style.display='flex';
+}
+function hideFilePicker(){
+  var el=document.getElementById('multi-filepick');
+  if(el)el.style.display='none';
+}
+function fpBrowse(cardIdx,path){
+  var mf=_multiFiles[cardIdx]; if(!mf) return;
+  var c=mf.config;
+  var list=document.getElementById('filepick-list');
+  if(!list) return;
+  list.innerHTML='<div style="padding:20px;text-align:center;color:var(--text2);font-size:13px">⏳ Memuatkan...</div>';
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+(path||'')+'?ref='+c.branch;
+  var headers={'Accept':'application/vnd.github.v3+json'};
+  var token=ghGetToken();
+  if(token)headers['Authorization']='token '+token;
+  fetch(apiUrl,{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      if(!Array.isArray(data)){
+        list.innerHTML='<div style="padding:16px;color:var(--red);font-size:13px;text-align:center">✕ Gagal muatkan senarai</div>';
+        return;
+      }
+      var html='';
+      if(path){
+        var parentPath=path.lastIndexOf('/')>=0?path.substring(0,path.lastIndexOf('/')):'';
+        html+='<div class="fp-item fp-back" onclick="fpBrowse('+cardIdx+',\''+parentPath+'\')">⬆ Balik</div>';
+      }
+      data.sort(function(a,b){
+        if(a.type==='dir'&&b.type!=='dir')return -1;
+        if(a.type!=='dir'&&b.type==='dir')return 1;
+        return a.name.localeCompare(b.name);
+      });
+      data.forEach(function(item){
+        if(item.type==='dir'){
+          html+='<div class="fp-item fp-dir" onclick="fpBrowse('+cardIdx+',\''+item.path+'\')">📁 '+item.name+'/</div>';
+        } else {
+          var isCur=item.path===c.path;
+          var sz=item.size?'('+Math.round(item.size/1024*10)/10+'KB)':'';
+          html+='<div class="fp-item" onclick="fpSelectFile('+cardIdx+',\''+item.path+'\')" style="'+(isCur?'border-color:var(--green);color:var(--green)':'')+'">📄 '+item.name+' <span style="font-size:10px;color:var(--text2);margin-left:4px">'+sz+'</span>'+(isCur?' ✓':'')+' </div>';
+        }
+      });
+      list.innerHTML=html||'<div style="padding:16px;text-align:center;color:var(--text2)">Folder kosong</div>';
+    })
+    .catch(function(e){
+      list.innerHTML='<div style="padding:16px;color:var(--red);font-size:13px;text-align:center">✕ '+e.message+'</div>';
+    });
+}
+function fpSelectFile(cardIdx,filePath){
+  var mf=_multiFiles[cardIdx]; if(!mf) return;
+  if(filePath===mf.config.path){hideFilePicker();showNotif('Fail sama — tiada perubahan','info');return;}
+  mf.config=Object.assign({},mf.config,{path:filePath});
+  mf.content=''; mf.loaded=false;
+  mf.status='⏳ Memuatkan '+filePath.split('/').pop()+'...';
+  mf.statusType='info';
+  hideFilePicker();
+  multiRender();
+  multiLoadFile(cardIdx);
+  showNotif('Tukar ke '+filePath.split('/').pop(),'info');
+}
+
+function multiDoReplace(){
+  var findTxt=document.getElementById('replace-find').value;
+  var withTxt=document.getElementById('replace-with').value;
+  if(!findTxt){showNotif('Isi teks untuk dicari','err');return;}
+  var targets=_multiTarget===-1
+    ?_multiFiles.map(function(_,i){return i;}).filter(function(i){return _multiFiles[i].loaded;})
+    :[_multiTarget];
+  if(!targets.length){showNotif('Tiada app yang dimuat','err');return;}
+  var totalGanti=0;
+  targets.forEach(function(i){
+    var mf=_multiFiles[i];
+    var found=flexFind(mf.content,findTxt);
+    if(!found.length) return;
+    var cLines=mf.content.split('\n'),offset=0;
+    found.forEach(function(r){
+      var s=r.startLine-offset,e=r.endLine-offset,rep=withTxt.split('\n');
+      cLines=cLines.slice(0,s).concat(rep).concat(cLines.slice(e+1));
+      offset+=(r.endLine-r.startLine+1)-rep.length;
+    });
+    mf.content=cLines.join('\n');
+    totalGanti+=found.length;
+    mf.status='✓ '+found.length+' gantian berjaya';
+    mf.statusType='ok';
+    multiRenderItem(i);
+  });
+  closeAllPanels();
+  showNotif(totalGanti?totalGanti+' gantian berjaya!':'Teks tidak dijumpai',totalGanti?'ok':'err');
+}
+
+function multiDoBulkReplace(){
+  var raw=document.getElementById('bulk-input').value;
+  var status=document.getElementById('bulk-status');
+  if(!raw.trim()){showNotif('Tampal blok Cari/Ganti dahulu','err');return;}
+  var pairs=parseBulkInput(raw);
+  if(!pairs.length){status.style.color='var(--red)';status.textContent='✕ Tiada blok Cari/Ganti dijumpai';return;}
+  var targets=_multiTarget===-1
+    ?_multiFiles.map(function(_,i){return i;}).filter(function(i){return _multiFiles[i].loaded;})
+    :[_multiTarget];
+  if(!targets.length){showNotif('Tiada app yang dimuat','err');return;}
+  var totalGanti=0,tidakJumpa=[];
+  targets.forEach(function(i){
+    var mf=_multiFiles[i];
+    var content=mf.content;
+    pairs.forEach(function(p){
+      var found=flexFind(content,p.find);
+      if(!found.length){
+        var key=p.find.substring(0,30).trim();
+        if(tidakJumpa.indexOf(key)<0) tidakJumpa.push(key);
+        return;
+      }
+      var cLines=content.split('\n'),offset=0;
+      found.forEach(function(r){
+        var s=r.startLine-offset,e=r.endLine-offset,rep=p.with.split('\n');
+        cLines=cLines.slice(0,s).concat(rep).concat(cLines.slice(e+1));
+        offset+=(r.endLine-r.startLine+1)-rep.length;
+      });
+      content=cLines.join('\n');
+      totalGanti+=found.length;
+    });
+    mf.content=content;
+    mf.status='✓ '+totalGanti+' gantian';
+    mf.statusType='ok';
+    multiRenderItem(i);
+  });
+  var msg='✓ '+totalGanti+' gantian dari '+pairs.length+' blok';
+  if(tidakJumpa.length) msg+=' | ✕ '+tidakJumpa.length+' tidak jumpa';
+  status.style.color=tidakJumpa.length?'var(--amber)':'var(--green)';
+  status.textContent=msg;
+  showNotif(totalGanti+' gantian berjaya!',totalGanti?'ok':'info');
+}
+
+function multiDeployOne(i){
+  var mf=_multiFiles[i]; if(!mf||!mf.loaded) return;
+  var c=mf.config;
+  var token=ghGetToken();
+  if(!token){showNotif('Simpan API Key dahulu dalam 🚀 Deploy → 🔑','err');return;}
+  mf.deploying=true; mf.status='⏳ Deploying...'; mf.statusType='info';
+  multiRenderItem(i);
+  var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path;
+  var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  fetch(apiUrl+'?ref='+c.branch,{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var sha=data.sha||null;
+      var body={message:'Update '+c.path+' via KodEdit Berbilang',content:btoa(unescape(encodeURIComponent(mf.content))),branch:c.branch};
+      if(sha) body.sha=sha;
+      return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)});
+    })
+    .then(function(r){return r.json();})
+    .then(function(data){
+      mf.deploying=false;
+      if(data.content){
+        mf.status='✓ Deploy berjaya! Pages sedang build...';
+        mf.statusType='ok';
+        showNotif('🚀 '+c.name+' berjaya deploy!','ok');
+      } else {
+        mf.status='✕ '+(data.message||'Gagal deploy');
+        mf.statusType='err';
+        showNotif('Deploy gagal: '+c.name,'err');
+      }
+      multiRenderItem(i);
+    })
+    .catch(function(e){
+      mf.deploying=false; mf.status='✕ '+e.message; mf.statusType='err';
+      multiRenderItem(i); showNotif('Deploy gagal','err');
+    });
+}
+
+function multiDownloadOne(i){
+  var mf=_multiFiles[i]; if(!mf||!mf.loaded) return;
+  var name=mf.config.path.split('/').pop()||mf.config.name+'.html';
+  var blob=new Blob([mf.content],{type:'text/plain;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download=name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},500);
+  showNotif('⬇ '+name,'ok');
+}
+
+function multiDeployAll(){
+  var loaded=_multiFiles.filter(function(mf){return mf.loaded;});
+  if(!loaded.length){showNotif('Tiada app yang dimuat','err');return;}
+  if(!confirm('Deploy '+loaded.length+' app serentak?')) return;
+  var delay=0;
+  _multiFiles.forEach(function(mf,i){
+    if(!mf.loaded) return;
+    setTimeout(function(){ multiDeployOne(i); },delay);
+    delay+=800;
+  });
+  showNotif('Deploy '+loaded.length+' app dimulakan...','info');
+}
+
+function multiDownloadAll(){
+  var loaded=_multiFiles.filter(function(mf){return mf.loaded;});
+  if(!loaded.length){showNotif('Tiada app yang dimuat','err');return;}
+  _multiFiles.forEach(function(mf,i){
+    if(!mf.loaded) return;
+    setTimeout(function(){ multiDownloadOne(i); },i*300);
+  });
+  showNotif('Memuat turun '+loaded.length+' app...','info');
 }
 
 // ═══════════════════════════════════
