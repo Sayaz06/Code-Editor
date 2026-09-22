@@ -3022,7 +3022,7 @@ function multiRefreshOne(i){
 
 function multiPreviewOne(i){
   var mf=_multiFiles[i]; if(!mf||!mf.loaded){showNotif('Fail belum dimuatkan','err');return;}
-  var blob=new Blob([mf.content],{type:'text/html;charset=utf-8'});
+  var blob=new Blob([getMultiCardContent(i)],{type:'text/html;charset=utf-8'});
   var url=URL.createObjectURL(blob);
   var tab=window.open(url,'_blank');
   if(!tab){showNotif('Benarkan popup untuk preview','err');return;}
@@ -3138,15 +3138,19 @@ function multiDoReplace(){
   var totalGanti=0;
   targets.forEach(function(i){
     var mf=_multiFiles[i];
-    var found=flexFind(mf.content,findTxt);
+    var curContent=getMultiCardContent(i);
+    var found=flexFind(curContent,findTxt);
     if(!found.length) return;
-    var cLines=mf.content.split('\n'),offset=0;
+    var cLines=curContent.split('\n'),offset=0;
     found.forEach(function(r){
       var s=r.startLine-offset,e=r.endLine-offset,rep=withTxt.split('\n');
       cLines=cLines.slice(0,s).concat(rep).concat(cLines.slice(e+1));
       offset+=(r.endLine-r.startLine+1)-rep.length;
     });
-    mf.content=cLines.join('\n');
+    var newContent=cLines.join('\n');
+    mf.content=newContent; mf.editContent=newContent; mf.hasLocalEdit=true;
+    var ta=document.getElementById('multi-ta-'+i); if(ta) ta.value=newContent;
+    multiSaveEdit(i);
     totalGanti+=found.length;
     mf.status='✓ '+found.length+' gantian berjaya';
     mf.statusType='ok';
@@ -3169,7 +3173,7 @@ function multiDoBulkReplace(){
   var totalGanti=0,tidakJumpa=[];
   targets.forEach(function(i){
     var mf=_multiFiles[i];
-    var content=mf.content;
+    var content=getMultiCardContent(i);
     pairs.forEach(function(p){
       var found=flexFind(content,p.find);
       if(!found.length){
@@ -3186,7 +3190,9 @@ function multiDoBulkReplace(){
       content=cLines.join('\n');
       totalGanti+=found.length;
     });
-    mf.content=content;
+    mf.content=content; mf.editContent=content; mf.hasLocalEdit=true;
+    var ta=document.getElementById('multi-ta-'+i); if(ta) ta.value=content;
+    multiSaveEdit(i);
     mf.status='✓ '+totalGanti+' gantian';
     mf.statusType='ok';
     multiRenderItem(i);
