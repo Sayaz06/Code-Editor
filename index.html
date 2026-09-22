@@ -662,6 +662,12 @@ auth.onAuthStateChanged(function(user){
     setupDragDrop();
     showNotif('Selamat datang: '+user.email,'ok');
     document.getElementById('status-fb').textContent = '☁ '+user.email.split('@')[0];
+    db.collection('users').doc(user.uid).collection('multiMode').doc('apps').get()
+      .then(function(doc){
+        if(doc.exists&&doc.data().apps&&doc.data().apps.length>0){
+          if(!_multiMode) toggleMultiMode();
+        }
+      }).catch(function(){});
   } else {
     currentUser = null;
     document.getElementById('login-screen').classList.remove('hide');
