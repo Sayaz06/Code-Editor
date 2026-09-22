@@ -2655,8 +2655,9 @@ function toggleMultiMode(){
     if(tbWrap)tbWrap.style.display='none';
     if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';btn.style.background='rgba(76,201,240,0.15)';}
     _multiTarget=-1;
+    _multiFiles=[];
     closeAllPanels();
-    if(currentUser){ghLoadFromFirebase(function(){if(_multiFiles.length===0)multiLoadList();else multiRender();});}
+    if(currentUser){ghLoadFromFirebase(function(){multiLoadList();});}
     else{multiRender();}
   } else {
     panel.style.display='none';
