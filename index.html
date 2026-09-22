@@ -662,19 +662,10 @@ auth.onAuthStateChanged(function(user){
     setupDragDrop();
     showNotif('Selamat datang: '+user.email,'ok');
     document.getElementById('status-fb').textContent = '☁ '+user.email.split('@')[0];
-    db.collection('users').doc(user.uid).collection('multiMode').doc('apps').get()
+    db.collection('users').doc(user.uid).collection('multiMode').doc('status').get()
       .then(function(doc){
-        if(doc.exists&&doc.data().apps&&doc.data().apps.length>0){
-          var savedApps=doc.data().apps;
+        if(doc.exists&&doc.data().active===true){
           if(!_multiMode) toggleMultiMode();
-          if(_multiFiles.length===0&&savedApps.length>0){
-            savedApps.forEach(function(s){
-              if(_multiFiles.some(function(mf){return mf.config.repo===s.repo&&mf.config.path===s.path;})) return;
-              _multiFiles.push({configIdx:-1,config:s,content:'',editContent:null,hasLocalEdit:false,loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
-            });
-            multiRender();
-            _multiFiles.forEach(function(mf,i){if(!mf.loaded)multiLoadFile(i);});
-          }
         }
       }).catch(function(){});
   } else {
@@ -2664,9 +2655,10 @@ function toggleMultiMode(){
     if(tbWrap)tbWrap.style.display='none';
     if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';btn.style.background='rgba(76,201,240,0.15)';}
     _multiTarget=-1;
-    _multiFiles=[];
     closeAllPanels();
-    if(currentUser){ghLoadFromFirebase(function(){multiLoadList();});}
+    if(currentUser) db.collection('users').doc(currentUser.uid).collection('multiMode').doc('status').set({active:true}).catch(function(){});
+    if(_multiFiles.length>0){multiRender();}
+    else if(currentUser){ghLoadFromFirebase(function(){multiLoadList();});}
     else{multiRender();}
   } else {
     panel.style.display='none';
@@ -2674,6 +2666,7 @@ function toggleMultiMode(){
     if(tbWrap)tbWrap.style.display='';
     _multiTarget=-1;
     if(btn){btn.style.borderColor='';btn.style.color='';btn.style.background='';}
+    if(currentUser) db.collection('users').doc(currentUser.uid).collection('multiMode').doc('status').set({active:false}).catch(function(){});
     var info=document.getElementById('multi-target-info');
     if(info){info.style.display='none';info.textContent='';}
   }
