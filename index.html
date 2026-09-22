@@ -665,7 +665,16 @@ auth.onAuthStateChanged(function(user){
     db.collection('users').doc(user.uid).collection('multiMode').doc('apps').get()
       .then(function(doc){
         if(doc.exists&&doc.data().apps&&doc.data().apps.length>0){
+          var savedApps=doc.data().apps;
           if(!_multiMode) toggleMultiMode();
+          if(_multiFiles.length===0&&savedApps.length>0){
+            savedApps.forEach(function(s){
+              if(_multiFiles.some(function(mf){return mf.config.repo===s.repo&&mf.config.path===s.path;})) return;
+              _multiFiles.push({configIdx:-1,config:s,content:'',editContent:null,hasLocalEdit:false,loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
+            });
+            multiRender();
+            _multiFiles.forEach(function(mf,i){if(!mf.loaded)multiLoadFile(i);});
+          }
         }
       }).catch(function(){});
   } else {
