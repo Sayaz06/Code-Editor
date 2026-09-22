@@ -2988,12 +2988,13 @@ function multiRenderItemHTML(i){
       '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⚡ Ganti Pukal</button>'+
       '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
       '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
-      '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
-      '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
-      '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
-      '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
-      '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
-      '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>👁 Preview</button>'+
+        '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
+        '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
+        '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
+        '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
+        '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
+        '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>👁 Preview</button>'+
+        '<button class="tool-btn" onclick="multiImportToEditor('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="border-color:var(--amber);color:var(--amber)">📝 Edit</button>'+
     '</div>'+
   '</div>';
 }
@@ -3029,6 +3030,7 @@ function multiRenderItemHTML(i){
         '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
         '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>👁 Preview</button>'+
+        '<button class="tool-btn" onclick="multiImportToEditor('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="border-color:var(--amber);color:var(--amber)">📝 Edit</button>'+
       '</div>'+
       '<textarea id="multi-ta-'+i+'" oninput="multiOnEdit('+i+')" spellcheck="false" placeholder="☁ kod disimpan awan..." '+(mf.loaded?'':'disabled')+' style="flex:1;min-width:60px;height:52px;resize:none;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:monospace;font-size:10px;line-height:1.4;padding:4px 6px;box-sizing:border-box;outline:none">'+taEsc+'</textarea>'+
     '</div>'+
@@ -3050,6 +3052,30 @@ function multiSetTarget(i){
   multiRender();
 }
 
+function multiImportToEditor(i){
+  var mf=_multiFiles[i];
+  if(!mf||!mf.loaded){showNotif('Tunggu fail dimuat dahulu','err');return;}
+  var content=mf.editContent!=null?mf.editContent:mf.content;
+  var c=mf.config;
+  S.fileName=c.path.split('/').pop();
+  S.filePath=c.path;
+  S.fileRepo=c.repo;
+  S.fileBranch=c.branch||'main';
+  inp().value=content;
+  updateAll();
+  document.getElementById('status-file').textContent=S.fileName;
+  _multiMode=false;
+  var panel=document.getElementById('multi-panel');
+  var edWrap=document.getElementById('editor-wrap');
+  var tbWrap=document.getElementById('toolbar-wrap');
+  var btn=document.getElementById('btn-multi');
+  if(panel)panel.style.display='none';
+  if(edWrap)edWrap.style.display='';
+  if(tbWrap)tbWrap.style.display='';
+  if(btn){btn.style.borderColor='';btn.style.color='';btn.style.background='';}
+  saveToStorage();
+  showNotif('Dimuat ke editor: '+S.fileName+' ('+c.repo+')','ok');
+}
 function multiRefreshOne(i){
   var mf=_multiFiles[i]; if(!mf) return;
   mf.loaded=false; mf.status='⏳ Memuatkan semula...'; mf.statusType='info';
