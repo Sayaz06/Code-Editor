@@ -226,12 +226,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <!-- TOPBAR -->
   <div id="topbar">
     <h1>⌨ KodEdit</h1>
+    <span id="topbar-single-btns">
     <button class="top-btn" onclick="openPanel('files-panel')" title="Fail">📁</button>
     <button class="top-btn" onclick="triggerUpload()" title="Upload">⬆</button>
     <button class="top-btn green" onclick="backupToFirebase()" title="Simpan ke Firebase">☁</button>
     <button class="top-btn accent" onclick="downloadFile()" title="Download">⬇</button>
-<button class="top-btn" onclick="previewHTML()" title="Preview" style="width:auto;padding:0 10px;font-size:13px">👁 Preview</button>
+    <button class="top-btn" onclick="previewHTML()" title="Preview" style="width:auto;padding:0 10px;font-size:13px">👁 Preview</button>
     <button class="top-btn" onclick="openPanel('github-panel')" title="Deploy ke GitHub" style="width:auto;padding:0 10px;font-size:13px;border-color:rgba(255,255,255,0.3);color:var(--text)">🚀 Deploy</button>
+    </span>
     <button class="top-btn" id="btn-multi" onclick="toggleMultiMode()" title="Mode Edit Berbilang" style="width:auto;padding:0 10px;font-size:13px;border-color:rgba(123,47,247,0.5);color:var(--text2)">⊞ Berbilang</button>
 
   </div>
@@ -686,6 +688,8 @@ auth.onAuthStateChanged(function(user){
           if(edWrap)edWrap.style.display='none';
           if(tbWrap)tbWrap.style.display='none';
           if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';btn.style.background='rgba(76,201,240,0.15)';}
+          var singleBtns=document.getElementById('topbar-single-btns');
+          if(singleBtns)singleBtns.style.display='none';
           _multiTarget=-1;
           closeAllPanels();
         }
@@ -2678,13 +2682,17 @@ function toggleMultiMode(){
   var panel=document.getElementById('multi-panel');
   var edWrap=document.getElementById('editor-wrap');
   var tbWrap=document.getElementById('toolbar-wrap');
+  var singleBtns=document.getElementById('topbar-single-btns');
   if(_multiMode){
     panel.style.display='flex';
     edWrap.style.display='none';
     if(tbWrap)tbWrap.style.display='none';
-    if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';btn.style.background='rgba(76,201,240,0.15)';}
-    _multiTarget=-1;
-    closeAllPanels();
+    if(singleBtns)singleBtns.style.display='none';
+          if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';btn.style.background='rgba(76,201,240,0.15)';}
+          var singleBtns=document.getElementById('topbar-single-btns');
+          if(singleBtns)singleBtns.style.display='none';
+          _multiTarget=-1;
+          closeAllPanels();
     if(currentUser) db.collection('users').doc(currentUser.uid).collection('multiMode').doc('status').set({active:true}).catch(function(){});
     if(_multiFiles.length>0){multiRender();}
     else if(currentUser){ghLoadFromFirebase(function(){multiLoadList();});}
@@ -2693,6 +2701,7 @@ function toggleMultiMode(){
     panel.style.display='none';
     edWrap.style.display='';
     if(tbWrap)tbWrap.style.display='';
+    if(singleBtns)singleBtns.style.display='';
     _multiTarget=-1;
     if(btn){btn.style.borderColor='';btn.style.color='';btn.style.background='';}
     if(currentUser) db.collection('users').doc(currentUser.uid).collection('multiMode').doc('status').set({active:false}).catch(function(){});
@@ -2847,12 +2856,47 @@ function getMultiCardContent(i){
   return mf?(mf.editContent!=null?mf.editContent:mf.content):'';
 }
 var _multiEditTimers={};
+var _multiUndoTimers={};
 function multiOnEdit(i){
   var mf=_multiFiles[i]; if(!mf) return;
   var ta=document.getElementById('multi-ta-'+i); if(!ta) return;
+  var prev=mf.editContent!=null?mf.editContent:mf.content;
   mf.editContent=ta.value; mf.hasLocalEdit=true;
+  clearTimeout(_multiUndoTimers[i]);
+  var savedPrev=prev;
+  _multiUndoTimers[i]=setTimeout(function(){
+    if(!mf.undoStack) mf.undoStack=[];
+    if(!mf.redoStack) mf.redoStack=[];
+    if(mf.undoStack[mf.undoStack.length-1]!==savedPrev){
+      mf.undoStack.push(savedPrev);
+      if(mf.undoStack.length>50) mf.undoStack.shift();
+      mf.redoStack=[];
+    }
+  },600);
   clearTimeout(_multiEditTimers[i]);
   _multiEditTimers[i]=setTimeout(function(){multiSaveEdit(i);},2000);
+}
+function multiUndo(i){
+  var mf=_multiFiles[i]; if(!mf||!mf.loaded) return;
+  if(!mf.undoStack||!mf.undoStack.length){showNotif('Tiada undo','info');return;}
+  if(!mf.redoStack) mf.redoStack=[];
+  var curr=mf.editContent!=null?mf.editContent:mf.content;
+  mf.redoStack.push(curr);
+  var prev=mf.undoStack.pop();
+  mf.editContent=prev; mf.hasLocalEdit=true;
+  var ta=document.getElementById('multi-ta-'+i);
+  if(ta) ta.value=prev;
+}
+function multiRedo(i){
+  var mf=_multiFiles[i]; if(!mf||!mf.loaded) return;
+  if(!mf.redoStack||!mf.redoStack.length){showNotif('Tiada redo','info');return;}
+  if(!mf.undoStack) mf.undoStack=[];
+  var curr=mf.editContent!=null?mf.editContent:mf.content;
+  mf.undoStack.push(curr);
+  var next=mf.redoStack.pop();
+  mf.editContent=next; mf.hasLocalEdit=true;
+  var ta=document.getElementById('multi-ta-'+i);
+  if(ta) ta.value=next;
 }
 function multiSaveEdit(i){
   if(!currentUser) return;
@@ -2984,12 +3028,14 @@ function multiRenderItemHTML(i){
       '<button class="tool-btn" onclick="multiRemoveApp('+i+')" style="flex-shrink:0;padding:0 8px;height:26px;font-size:11px;border-color:var(--red);color:var(--red)">✕</button>'+
     '</div>'+
     '<div class="multi-app-btns">'+
-      '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'single\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>🔄 Ganti</button>'+
-      '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⚡ Ganti Pukal</button>'+
-      '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
-      '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
+        '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'single\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>🔄 Ganti</button>'+
+        '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⚡ Ganti Pukal</button>'+
+        '<button class="tool-btn" onclick="multiUndo('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>↩ Undo</button>'+
+        '<button class="tool-btn" onclick="multiRedo('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>↪ Redo</button>'+
+        '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
+        '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
         '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
-        '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
+        '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Reset</button>'+
         '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
@@ -3022,10 +3068,12 @@ function multiRenderItemHTML(i){
       '<div class="multi-app-btns" style="flex:0 0 auto">'+
         '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'single\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>🔄 Ganti</button>'+
         '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⚡ Ganti Pukal</button>'+
+        '<button class="tool-btn" onclick="multiUndo('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>↩ Undo</button>'+
+        '<button class="tool-btn" onclick="multiRedo('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>↪ Redo</button>'+
         '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
         '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
         '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
-        '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
+        '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Reset</button>'+
         '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
