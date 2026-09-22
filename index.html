@@ -2971,36 +2971,29 @@ function multiRenderItemHTML(i){
   var _ghFile=_ghBase+c.path;
   var taContent=mf.loaded?(mf.editContent!=null?mf.editContent:mf.content):'';
   var taEsc=taContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  return '<div class="multi-app-card" id="multi-card-'+i+'" style="display:flex;min-height:240px;padding:0;gap:0;'+(isTarget?'border-color:var(--accent);':'')+'">'+
-    '<div style="width:46%;min-width:170px;flex-shrink:0;padding:10px 12px;display:flex;flex-direction:column;gap:5px;border-right:1px solid var(--border);overflow:hidden">'+
-      '<div style="display:flex;align-items:flex-start;gap:6px">'+
-        '<div style="flex:1;min-width:0">'+
-          '<div class="multi-app-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(isTarget?'🎯 ':'')+c.name+'</div>'+
-          '<div class="multi-app-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.repo+'</div>'+
-          '<div class="multi-app-meta" style="color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fname+'</div>'+
-          '<div class="multi-app-status" style="color:'+sc+'">'+mf.status+'</div>'+
-          (mf.hasLocalEdit?'<div style="font-size:10px;color:var(--amber)">⚠ Edit belum deploy</div>':'')+
-        '</div>'+
-        '<button class="tool-btn" onclick="multiRemoveApp('+i+')" style="flex-shrink:0;padding:0 6px;height:24px;font-size:11px;border-color:var(--red);color:var(--red)">✕</button>'+
+  return '<div class="multi-app-card" id="multi-card-'+i+'" style="'+(isTarget?'border-color:var(--accent);':'')+'">'+
+    '<div class="multi-app-top">'+
+      '<div class="multi-app-info">'+
+        '<div class="multi-app-name">'+(isTarget?'🎯 ':'')+c.name+'</div>'+
+        '<div class="multi-app-meta">'+c.repo+' · <span style="color:var(--accent)">'+fname+'</span></div>'+
+        '<div class="multi-app-status" style="color:'+sc+'">'+mf.status+(mf.hasLocalEdit?' <span style="color:var(--amber);font-size:10px">⚠ belum deploy</span>':'')+'</div>'+
       '</div>'+
-      '<div style="display:flex;flex-wrap:wrap;gap:3px">'+
-        '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'single\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">🔄 Ganti</button>'+
-        '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">⚡ Pukal</button>'+
-        '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="font-size:11px;padding:3px 6px;border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
-        '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">🚀 Deploy</button>'+
-        '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">⬇ DL</button>'+
-        '<button class="tool-btn" onclick="multiRefreshOne('+i+')" style="font-size:11px;padding:3px 6px">↺ Muat</button>'+
-        '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="font-size:11px;padding:3px 6px;border-color:var(--accent);color:var(--accent)">🔍</button>'+
-        '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="font-size:11px;padding:3px 6px;border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
-        '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="font-size:11px;padding:3px 6px;border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
-        '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">👁 Preview</button>'+
-      '</div>'+
+      '<button class="tool-btn" onclick="multiRemoveApp('+i+')" style="flex-shrink:0;padding:0 8px;height:26px;font-size:11px;border-color:var(--red);color:var(--red)">✕</button>'+
     '</div>'+
-    '<div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)">'+
-      (mf.loaded?
-        '<textarea id="multi-ta-'+i+'" oninput="multiOnEdit('+i+')" spellcheck="false" style="flex:1;width:100%;border:none;outline:none;resize:none;background:transparent;color:var(--text);font-family:monospace;font-size:11px;line-height:1.5;padding:10px;tab-size:2;box-sizing:border-box">'+taEsc+'</textarea>':
-        '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:13px">⏳ Memuatkan...</div>'
-      )+
+    '<div style="display:flex;align-items:center;gap:6px">'+
+      '<div class="multi-app-btns" style="flex:0 0 auto">'+
+        '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'single\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>🔄 Ganti</button>'+
+        '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⚡ Ganti Pukal</button>'+
+        '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
+        '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
+        '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
+        '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
+        '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
+        '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
+        '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
+        '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>👁 Preview</button>'+
+      '</div>'+
+      '<textarea id="multi-ta-'+i+'" oninput="multiOnEdit('+i+')" spellcheck="false" placeholder="☁ kod disimpan awan..." '+(mf.loaded?'':'disabled')+' style="flex:1;min-width:60px;height:52px;resize:none;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:monospace;font-size:10px;line-height:1.4;padding:4px 6px;box-sizing:border-box;outline:none">'+taEsc+'</textarea>'+
     '</div>'+
   '</div>';
 }
