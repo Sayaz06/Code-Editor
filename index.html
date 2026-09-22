@@ -2872,9 +2872,10 @@ function multiSaveEdit(i){
 function multiLoadFirebaseEdit(i,ghContent){
   var mf=_multiFiles[i]; if(!mf) return;
   mf.content=ghContent;
-  if(!currentUser){
+  if(!currentUser||mf._reset){
+    mf._reset=false;
     mf.editContent=null;mf.hasLocalEdit=false;mf.loaded=true;
-    mf.status='✓ Dimuat dari GitHub';mf.statusType='ok';
+    mf.status='✓ Dimuat semula dari GitHub';mf.statusType='ok';
     multiRenderItem(i);return;
   }
   var key=multiEditKey(i);
@@ -3089,8 +3090,14 @@ function multiImportToEditor(i){
 }
 function multiRefreshOne(i){
   var mf=_multiFiles[i]; if(!mf) return;
-  mf.loaded=false; mf.status='⏳ Memuatkan semula...'; mf.statusType='info';
+  mf.loaded=false; mf.editContent=null; mf.hasLocalEdit=false; mf._reset=true;
+  mf.status='⏳ Memuatkan semula...'; mf.statusType='info';
   multiRenderItem(i);
+  if(currentUser){
+    var key=multiEditKey(i);
+    var cl={}; cl[key]=firebase.firestore.FieldValue.delete();
+    db.collection('users').doc(currentUser.uid).collection('multiMode').doc('edits').update(cl).catch(function(){});
+  }
   multiLoadFile(i);
 }
 
