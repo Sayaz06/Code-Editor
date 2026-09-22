@@ -662,14 +662,41 @@ auth.onAuthStateChanged(function(user){
     setupDragDrop();
     showNotif('Selamat datang: '+user.email,'ok');
     document.getElementById('status-fb').textContent = '☁ '+user.email.split('@')[0];
-    db.collection('users').doc(user.uid).collection('multiMode').doc('status').get()
-      .then(function(doc){
-        if(doc.exists&&doc.data().active===true){
-          if(!_multiMode) toggleMultiMode();
+    if(_multiUnsub){_multiUnsub();_multiUnsub=null;}
+    _multiUnsub=db.collection('users').doc(user.uid).collection('multiMode').doc('apps').onSnapshot(function(doc){
+      if(!doc.exists||!doc.data().apps||doc.data().apps.length===0) return;
+      if(_multiFiles.length>0) return;
+      ghLoadFromFirebase(function(){
+        var configs=ghGetConfigs();
+        var saved=doc.data().apps||[];
+        saved.forEach(function(s){
+          if(_multiFiles.some(function(mf){return mf.config.repo===s.repo&&mf.config.path===s.path;})) return;
+          var idx=-1;
+          configs.forEach(function(cv,ci){if(cv.repo===s.repo&&cv.path===s.path)idx=ci;});
+          var cfg=idx>=0?configs[idx]:s;
+          _multiFiles.push({configIdx:idx,config:cfg,content:'',editContent:null,hasLocalEdit:false,loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
+        });
+        if(!_multiMode){
+          _multiMode=true;
+          var panel=document.getElementById('multi-panel');
+          var edWrap=document.getElementById('editor-wrap');
+          var tbWrap=document.getElementById('toolbar-wrap');
+          var btn=document.getElementById('btn-multi');
+          if(panel)panel.style.display='flex';
+          if(edWrap)edWrap.style.display='none';
+          if(tbWrap)tbWrap.style.display='none';
+          if(btn){btn.style.borderColor='var(--accent)';btn.style.color='var(--accent)';btn.style.background='rgba(76,201,240,0.15)';}
+          _multiTarget=-1;
+          closeAllPanels();
         }
-      }).catch(function(){});
+        multiRender();
+        _multiFiles.forEach(function(mf,i){if(!mf.loaded)multiLoadFile(i);});
+      });
+    },function(){});
   } else {
     currentUser = null;
+    if(_multiUnsub){_multiUnsub();_multiUnsub=null;}
+    _multiFiles=[];_multiMode=false;
     document.getElementById('login-screen').classList.remove('hide');
   }
 });
@@ -2285,7 +2312,8 @@ function restoreBackup(idx){
 // ═══════════════════════════════════
 var _multiMode=false;
 var _multiFiles=[];
-var _multiTarget=-1; // -1=semua, >=0=app tertentu
+var _multiTarget=-1;
+var _multiUnsub=null;
 
 function toggleMultiMode(){
   _multiMode=!_multiMode;
@@ -2642,6 +2670,7 @@ function multiDownloadAll(){
 var _multiMode=false;
 var _multiFiles=[];
 var _multiTarget=-1;
+var _multiUnsub=null;
 
 function toggleMultiMode(){
   _multiMode=!_multiMode;
