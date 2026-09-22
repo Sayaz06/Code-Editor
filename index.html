@@ -2693,10 +2693,9 @@ function multiRenderPicker(){
     list.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app dalam Deploy. Tambah dulu dalam 🚀 Deploy.</div>';
     return;
   }
-  var addedIdxs=_multiFiles.map(function(mf){return mf.configIdx;});
   var html='';
   configs.forEach(function(c,i){
-    var isAdded=addedIdxs.indexOf(i)>=0;
+    var isAdded=_multiFiles.some(function(mf){return mf.config.repo===c.repo&&mf.config.path===c.path;});
     html+='<div class="picker-item">'+
       '<div class="file-info">'+
         '<div class="file-name">'+c.name+'</div>'+
