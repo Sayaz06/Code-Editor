@@ -2423,6 +2423,7 @@ function multiRemoveApp(i){
   _multiFiles.splice(i,1);
   if(_multiTarget>=_multiFiles.length) _multiTarget=-1;
   multiRender();
+  multiSaveList();
 }
 
 function showMultiPicker(){
@@ -2706,10 +2707,11 @@ function multiRenderPicker(){
 function multiAddApp(configIdx){
   var already=_multiFiles.some(function(mf){return mf.configIdx===configIdx;});
   if(already){showNotif('App sudah ada dalam senarai','info');return;}
+  if(_multiFiles.length>=4){showNotif('Had maksimum 4 app sahaja','err');return;}
   var configs=ghGetConfigs();
   var c=configs[configIdx];
   if(!c) return;
-  _multiFiles.push({configIdx:configIdx,config:c,content:'',loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
+  _multiFiles.push({configIdx:configIdx,config:c,content:'',editContent:null,hasLocalEdit:false,loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
   multiRender();
   multiLoadFile(_multiFiles.length-1);
   multiSaveList();
@@ -2768,11 +2770,7 @@ function multiLoadFromGH(i){
     .then(function(r){return r.json();})
     .then(function(data){
       function setContent(content){
-        _multiFiles[i].content=content;
-        _multiFiles[i].loaded=true;
-        _multiFiles[i].status='✓ Dimuat dari GitHub';
-        _multiFiles[i].statusType='ok';
-        multiRenderItem(i);
+        multiLoadFirebaseEdit(i,content);
       }
       if(data.content){
         try{
@@ -2799,6 +2797,114 @@ function multiLoadFromGH(i){
       _multiFiles[i].statusType='err';
       multiRenderItem(i);
     });
+}
+
+function multiEditKey(i){
+  var mf=_multiFiles[i]; if(!mf) return '';
+  return (mf.config.repo+'__'+mf.config.path).replace(/[\/\.\-\s]/g,'_');
+}
+function getMultiCardContent(i){
+  var ta=document.getElementById('multi-ta-'+i);
+  if(ta) return ta.value;
+  var mf=_multiFiles[i];
+  return mf?(mf.editContent!=null?mf.editContent:mf.content):'';
+}
+var _multiEditTimers={};
+function multiOnEdit(i){
+  var mf=_multiFiles[i]; if(!mf) return;
+  var ta=document.getElementById('multi-ta-'+i); if(!ta) return;
+  mf.editContent=ta.value; mf.hasLocalEdit=true;
+  clearTimeout(_multiEditTimers[i]);
+  _multiEditTimers[i]=setTimeout(function(){multiSaveEdit(i);},2000);
+}
+function multiSaveEdit(i){
+  if(!currentUser) return;
+  var mf=_multiFiles[i]; if(!mf||!mf.loaded) return;
+  var key=multiEditKey(i); var upd={}; upd[key]=getMultiCardContent(i);
+  db.collection('users').doc(currentUser.uid).collection('multiMode').doc('edits').set(upd,{merge:true}).catch(function(){});
+}
+function multiLoadFirebaseEdit(i,ghContent){
+  var mf=_multiFiles[i]; if(!mf) return;
+  mf.content=ghContent;
+  if(!currentUser){
+    mf.editContent=null;mf.hasLocalEdit=false;mf.loaded=true;
+    mf.status='✓ Dimuat dari GitHub';mf.statusType='ok';
+    multiRenderItem(i);return;
+  }
+  var key=multiEditKey(i);
+  db.collection('users').doc(currentUser.uid).collection('multiMode').doc('edits').get()
+    .then(function(doc){
+      var saved=doc.exists&&doc.data()[key]?doc.data()[key]:null;
+      mf.editContent=saved;
+      mf.hasLocalEdit=!!(saved&&saved!==ghContent);
+      mf.loaded=true;
+      mf.status='✓ Dimuat dari GitHub'+(mf.hasLocalEdit?' (ada edit)':'');
+      mf.statusType='ok';
+      multiRenderItem(i);
+    }).catch(function(){
+      mf.editContent=null;mf.hasLocalEdit=false;mf.loaded=true;
+      mf.status='✓ Dimuat dari GitHub';mf.statusType='ok';
+      multiRenderItem(i);
+    });
+}
+function multiSaveList(){
+  if(!currentUser) return;
+  var apps=_multiFiles.map(function(mf){return {name:mf.config.name,repo:mf.config.repo,path:mf.config.path,branch:mf.config.branch};});
+  db.collection('users').doc(currentUser.uid).collection('multiMode').doc('apps').set({apps:apps}).catch(function(){});
+}
+function multiLoadList(){
+  if(!currentUser){multiRender();return;}
+  var configs=ghGetConfigs();
+  db.collection('users').doc(currentUser.uid).collection('multiMode').doc('apps').get()
+    .then(function(doc){
+      if(!doc.exists){multiRender();return;}
+      var saved=doc.data().apps||[];
+      saved.forEach(function(s){
+        var already=_multiFiles.some(function(mf){return mf.config.repo===s.repo&&mf.config.path===s.path;});
+        if(already) return;
+        var idx=-1;
+        configs.forEach(function(cv,ci){if(cv.repo===s.repo&&cv.path===s.path)idx=ci;});
+        var cfg=idx>=0?configs[idx]:s;
+        _multiFiles.push({configIdx:idx,config:cfg,content:'',editContent:null,hasLocalEdit:false,loaded:false,status:'⏳ Memuatkan...',statusType:'info',deploying:false});
+      });
+      multiRender();
+      _multiFiles.forEach(function(mf,i){if(!mf.loaded)multiLoadFile(i);});
+    }).catch(function(){multiRender();});
+}
+function _getEditContent(){
+  if(_multiMode){
+    if(_multiTarget>=0&&_multiFiles[_multiTarget]&&_multiFiles[_multiTarget].loaded)
+      return getMultiCardContent(_multiTarget);
+    var idx=_multiFiles.findIndex(function(m){return m.loaded;});
+    return idx>=0?getMultiCardContent(idx):'';
+  }
+  return inp().value;
+}
+function multiPreviewOne(i){
+  var mf=_multiFiles[i]; if(!mf||!mf.loaded) return;
+  var blob=new Blob([getMultiCardContent(i)],{type:'text/html;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  window.open(url,'_blank');
+  setTimeout(function(){URL.revokeObjectURL(url);},15000);
+}
+function multiCheckStatus(i){
+  var mf=_multiFiles[i]; if(!mf) return;
+  var c=mf.config;
+  var token=ghGetToken();
+  var headers={'Accept':'application/vnd.github.v3+json'};
+  if(token) headers['Authorization']='token '+token;
+  mf.status='⏳ Semak Pages...'; mf.statusType='info'; multiRenderItem(i);
+  fetch('https://api.github.com/repos/'+c.repo+'/pages/builds',{headers:headers})
+    .then(function(r){return r.json();})
+    .then(function(data){
+      var latest=Array.isArray(data)?data[0]:null;
+      if(latest){
+        var st=latest.status;
+        mf.status=st==='built'?'✓ Pages aktif':st==='building'?'⏳ Pages sedang build...':'✕ '+st;
+        mf.statusType=st==='built'?'ok':st==='building'?'info':'err';
+      } else {mf.status='⚠ Tiada data Pages';mf.statusType='info';}
+      multiRenderItem(i);
+    }).catch(function(){mf.status='✕ Gagal semak status';mf.statusType='err';multiRenderItem(i);});
 }
 
 function multiRender(){
@@ -2855,6 +2961,49 @@ function multiRenderItemHTML(i){
   '</div>';
 }
 
+function multiRenderItemHTML(i){
+  var mf=_multiFiles[i]; var c=mf.config;
+  var isTarget=_multiTarget===i;
+  var sc=mf.statusType==='ok'?'var(--green)':mf.statusType==='err'?'var(--red)':'var(--amber)';
+  var fname=c.path.split('/').pop();
+  var _rp=c.repo.split('/');
+  var _ghBase='https://'+_rp[0]+'.github.io/'+_rp[1]+'/';
+  var _ghFile=_ghBase+c.path;
+  var taContent=mf.loaded?(mf.editContent!=null?mf.editContent:mf.content):'';
+  var taEsc=taContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return '<div class="multi-app-card" id="multi-card-'+i+'" style="display:flex;min-height:240px;padding:0;gap:0;'+(isTarget?'border-color:var(--accent);':'')+'">'+
+    '<div style="width:46%;min-width:170px;flex-shrink:0;padding:10px 12px;display:flex;flex-direction:column;gap:5px;border-right:1px solid var(--border);overflow:hidden">'+
+      '<div style="display:flex;align-items:flex-start;gap:6px">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div class="multi-app-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+(isTarget?'🎯 ':'')+c.name+'</div>'+
+          '<div class="multi-app-meta" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+c.repo+'</div>'+
+          '<div class="multi-app-meta" style="color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+fname+'</div>'+
+          '<div class="multi-app-status" style="color:'+sc+'">'+mf.status+'</div>'+
+          (mf.hasLocalEdit?'<div style="font-size:10px;color:var(--amber)">⚠ Edit belum deploy</div>':'')+
+        '</div>'+
+        '<button class="tool-btn" onclick="multiRemoveApp('+i+')" style="flex-shrink:0;padding:0 6px;height:24px;font-size:11px;border-color:var(--red);color:var(--red)">✕</button>'+
+      '</div>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:3px">'+
+        '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'single\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">🔄 Ganti</button>'+
+        '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">⚡ Pukal</button>'+
+        '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="font-size:11px;padding:3px 6px;border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
+        '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">🚀 Deploy</button>'+
+        '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">⬇ DL</button>'+
+        '<button class="tool-btn" onclick="multiRefreshOne('+i+')" style="font-size:11px;padding:3px 6px">↺ Muat</button>'+
+        '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="font-size:11px;padding:3px 6px;border-color:var(--accent);color:var(--accent)">🔍</button>'+
+        '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="font-size:11px;padding:3px 6px;border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
+        '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="font-size:11px;padding:3px 6px;border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
+        '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="font-size:11px;padding:3px 6px">👁 Preview</button>'+
+      '</div>'+
+    '</div>'+
+    '<div style="flex:1;display:flex;flex-direction:column;min-width:0;background:var(--bg)">'+
+      (mf.loaded?
+        '<textarea id="multi-ta-'+i+'" oninput="multiOnEdit('+i+')" spellcheck="false" style="flex:1;width:100%;border:none;outline:none;resize:none;background:transparent;color:var(--text);font-family:monospace;font-size:11px;line-height:1.5;padding:10px;tab-size:2;box-sizing:border-box">'+taEsc+'</textarea>':
+        '<div style="flex:1;display:flex;align-items:center;justify-content:center;color:var(--text2);font-size:13px">⏳ Memuatkan...</div>'
+      )+
+    '</div>'+
+  '</div>';
+}
 function multiSetTarget(i){
   _multiTarget=i;
   var info=document.getElementById('multi-target-info');
@@ -3061,6 +3210,7 @@ function multiDeployOne(i){
   var c=mf.config;
   var token=ghGetToken();
   if(!token){showNotif('Simpan API Key dahulu dalam 🚀 Deploy → 🔑','err');return;}
+  var deployContent=getMultiCardContent(i);
   mf.deploying=true; mf.status='⏳ Deploying...'; mf.statusType='info';
   multiRenderItem(i);
   var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+c.path;
@@ -3069,7 +3219,7 @@ function multiDeployOne(i){
     .then(function(r){return r.json();})
     .then(function(data){
       var sha=data.sha||null;
-      var body={message:'Update '+c.path+' via KodEdit Berbilang',content:btoa(unescape(encodeURIComponent(mf.content))),branch:c.branch};
+      var body={message:'Update '+c.path+' via KodEdit Berbilang',content:btoa(unescape(encodeURIComponent(deployContent))),branch:c.branch};
       if(sha) body.sha=sha;
       return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)});
     })
@@ -3077,12 +3227,12 @@ function multiDeployOne(i){
     .then(function(data){
       mf.deploying=false;
       if(data.content){
-        mf.status='✓ Deploy berjaya! Pages sedang build...';
-        mf.statusType='ok';
+        mf.status='✓ Deploy berjaya! Pages sedang build...'; mf.statusType='ok';
+        mf.content=deployContent; mf.editContent=null; mf.hasLocalEdit=false;
         showNotif('🚀 '+c.name+' berjaya deploy!','ok');
+        if(currentUser){var k=multiEditKey(i);var cl={};cl[k]=firebase.firestore.FieldValue.delete();db.collection('users').doc(currentUser.uid).collection('multiMode').doc('edits').update(cl).catch(function(){});}
       } else {
-        mf.status='✕ '+(data.message||'Gagal deploy');
-        mf.statusType='err';
+        mf.status='✕ '+(data.message||'Gagal deploy'); mf.statusType='err';
         showNotif('Deploy gagal: '+c.name,'err');
       }
       multiRenderItem(i);
@@ -3096,7 +3246,7 @@ function multiDeployOne(i){
 function multiDownloadOne(i){
   var mf=_multiFiles[i]; if(!mf||!mf.loaded) return;
   var name=mf.config.path.split('/').pop()||mf.config.name+'.html';
-  var blob=new Blob([mf.content],{type:'text/plain;charset=utf-8'});
+  var blob=new Blob([getMultiCardContent(i)],{type:'text/plain;charset=utf-8'});
   var url=URL.createObjectURL(blob);
   var a=document.createElement('a'); a.href=url; a.download=name;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
