@@ -3399,7 +3399,7 @@ if(id==='github-panel'){
     }
     if(id==='replace-panel'){
       document.getElementById('replace-preview').style.display='none';
-      setTimeout(function(){document.getElementById('replace-find').focus();},350);
+      if(document.activeElement&&document.activeElement.blur) document.activeElement.blur();
     }
   },50);
 }
