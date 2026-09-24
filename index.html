@@ -1751,13 +1751,25 @@ function setupLongPress(){
     else { S.selEnd=line; applyLineSelect(); updateSelBar(); }
   });
 }
+function focusNoKb(el){
+  el.setAttribute('readonly','readonly');
+  el.focus();
+  if(el._nkBound) return;
+  el._nkBound=true;
+  var unlock=function(){
+    if(typeof S!=='undefined'&&S.selMode) return;
+    el.removeAttribute('readonly');
+  };
+  el.addEventListener('pointerdown',unlock);
+  el.addEventListener('blur',function(){el.removeAttribute('readonly');});
+}
 function applyLineSelect(){
   var el=inp(),lines=el.value.split('\n');
   var s=Math.min(S.selStart,S.selEnd),e=Math.max(S.selStart,S.selEnd);
   var start=0; for(var i=0;i<s;i++) start+=lines[i].length+1;
   var end=start; for(var j=s;j<=e;j++) end+=lines[j].length+1;
   end=Math.min(end-1,el.value.length);
-  el.setSelectionRange(start,end); el.focus();
+  focusNoKb(el); el.setSelectionRange(start,end);
 }
 function updateSelBar(){
   var s=Math.min(S.selStart,S.selEnd),e=Math.max(S.selStart,S.selEnd);
@@ -1901,7 +1913,7 @@ function jumpToFound(){
   var endPos=pos;
   for(var j=r.startLine;j<=r.endLine;j++) endPos+=lines[j].length+1;
   endPos=Math.min(endPos-1,el.value.length);
-  el.focus(); el.setSelectionRange(pos,endPos);
+  focusNoKb(el); el.setSelectionRange(pos,endPos);
   setTimeout(function(){ el.scrollTop=Math.max(0,(r.startLine-3)*22); afterScroll(); },30);
   showNotif('Baris '+(r.startLine+1)+' — '+(r.endLine+1),'info');
 }
@@ -1971,7 +1983,7 @@ function doReplace(){
     var endPos=pos;
     for(var j=firstNewStart;j<=firstNewEnd;j++) endPos+=lines[j].length+1;
     endPos=Math.min(endPos-1,el.value.length);
-    el.focus(); el.setSelectionRange(pos,endPos);
+    focusNoKb(el); el.setSelectionRange(pos,endPos);
     setTimeout(function(){el.scrollTop=Math.max(0,(firstNewStart-3)*22);afterScroll();},30);
     document.getElementById('replace-done-msg').textContent='✓ '+found.length+' gantian — Baris '+(firstNewStart+1);
     document.getElementById('unhighlight-bar').style.display='block';
@@ -2235,7 +2247,7 @@ function jumpToLine(){
   var n=parseInt(num)-1,el=inp(),lines=el.value.split('\n');
   n=Math.max(0,Math.min(n,lines.length-1));
   var pos=0; for(var i=0;i<n;i++) pos+=lines[i].length+1;
-  el.focus(); el.setSelectionRange(pos,pos+lines[n].length);
+  focusNoKb(el); el.setSelectionRange(pos,pos+lines[n].length);
   setTimeout(function(){el.scrollTop=Math.max(0,(n-3)*22);afterScroll();},30);
   showNotif('Baris '+(n+1),'info');
 }
