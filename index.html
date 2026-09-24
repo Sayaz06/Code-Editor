@@ -2968,15 +2968,33 @@ function multiRender(){
     return;
   }
   if(empty) empty.style.display='none';
+  var olds={};
+  list.querySelectorAll('textarea[id^="multi-ta-"]').forEach(function(t){olds[t.id]=t;});
   var html='';
   _multiFiles.forEach(function(mf,i){ html+=multiRenderItemHTML(i); });
   list.innerHTML=html;
+  _multiFiles.forEach(function(mf,i){ multiFillTA(i,olds['multi-ta-'+i]); });
 }
 
 function multiRenderItem(i){
   var el=document.getElementById('multi-card-'+i);
-  if(el) el.outerHTML=multiRenderItemHTML(i);
-  else multiRender();
+  if(!el){multiRender();return;}
+  var oldTa=document.getElementById('multi-ta-'+i);
+  el.outerHTML=multiRenderItemHTML(i);
+  multiFillTA(i,oldTa);
+}
+
+function multiFillTA(i,oldTa){
+  var mf=_multiFiles[i];
+  var ta=document.getElementById('multi-ta-'+i);
+  if(!mf||!ta) return;
+  var val=mf.loaded?(mf.editContent!=null?mf.editContent:mf.content):'';
+  if(oldTa&&oldTa!==ta&&oldTa.value===val){
+    ta.parentNode.replaceChild(oldTa,ta);
+    oldTa.disabled=!mf.loaded;
+    return;
+  }
+  ta.value=val;
 }
 
 function multiRenderItemHTML(i){
@@ -3019,8 +3037,7 @@ function multiRenderItemHTML(i){
   var _rp=c.repo.split('/');
   var _ghBase='https://'+_rp[0]+'.github.io/'+_rp[1]+'/';
   var _ghFile=_ghBase+c.path;
-  var taContent=mf.loaded?(mf.editContent!=null?mf.editContent:mf.content):'';
-  var taEsc=taContent.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  var taEsc='';
   return '<div class="multi-app-card" id="multi-card-'+i+'" style="'+(isTarget?'border-color:var(--accent);':'')+'">'+
     '<div class="multi-app-top">'+
       '<div class="multi-app-info">'+
@@ -3044,7 +3061,7 @@ function multiRenderItemHTML(i){
         '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>👁 Preview</button>'+
         '<button class="tool-btn" onclick="multiImportToEditor('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="border-color:var(--amber);color:var(--amber)">📝 Edit</button>'+
       '</div>'+
-      '<textarea id="multi-ta-'+i+'" oninput="multiOnEdit('+i+')" spellcheck="false" placeholder="☁ kod disimpan awan..." '+(mf.loaded?'':'disabled')+' style="flex:0 0 65px;width:65px;height:52px;resize:none;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:monospace;font-size:10px;line-height:1.4;padding:4px 6px;box-sizing:border-box;outline:none">'+taEsc+'</textarea>'+
+      '<textarea id="multi-ta-'+i+'" oninput="multiOnEdit('+i+')" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" wrap="off" placeholder="☁ kod disimpan awan..." '+(mf.loaded?'':'disabled')+' style="flex:0 0 65px;width:65px;height:52px;resize:none;white-space:pre;overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:monospace;font-size:10px;line-height:1.4;padding:4px 6px;box-sizing:border-box;outline:none">'+taEsc+'</textarea>'+
     '</div>'+
   '</div>';
 }
@@ -3061,7 +3078,13 @@ function multiSetTarget(i){
       info.textContent='🎯 Sasaran: '+(mf?mf.config.name:'App '+(i+1));
     }
   }
-  multiRender();
+  _multiFiles.forEach(function(m,j){
+    var card=document.getElementById('multi-card-'+j); if(!card) return;
+    var on=j===i;
+    card.style.borderColor=on?'var(--accent)':'';
+    var nm=card.querySelector('.multi-app-name');
+    if(nm) nm.textContent=(on?'🎯 ':'')+m.config.name;
+  });
 }
 
 function multiImportToEditor(i){
@@ -3073,9 +3096,14 @@ function multiImportToEditor(i){
   S.filePath=c.path;
   S.fileRepo=c.repo;
   S.fileBranch=c.branch||'main';
-  inp().value=content;
-  updateAll();
   document.getElementById('status-file').textContent=S.fileName;
+  showNotif('⏳ Memuatkan '+S.fileName+'...','info');
+  setTimeout(function(){
+    inp().value=content;
+    updateAll();
+    saveToStorage();
+    showNotif('Dimuat ke editor: '+S.fileName+' ('+c.repo+')','ok');
+  },30);
   _multiMode=false;
   var panel=document.getElementById('multi-panel');
   var edWrap=document.getElementById('editor-wrap');
@@ -3087,8 +3115,6 @@ function multiImportToEditor(i){
     if(tbWrap)tbWrap.style.display='';
     if(singleBtns)singleBtns.style.display='contents';
     if(btn){btn.style.borderColor='';btn.style.color='';btn.style.background='';}
-  saveToStorage();
-  showNotif('Dimuat ke editor: '+S.fileName+' ('+c.repo+')','ok');
 }
 function multiRefreshOne(i){
   var mf=_multiFiles[i]; if(!mf) return;
