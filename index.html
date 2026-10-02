@@ -247,6 +247,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="tool-btn" onclick="jumpToLine()">≡ Baris</button>
     <button class="tool-btn" onclick="copyAll()">📋 Salin Semua</button>
     <button class="tool-btn" onclick="pasteAll()">📥 Tampal Semua</button>
+    <button class="tool-btn" onclick="strukturFailEditor()" style="border-color:var(--green);color:var(--green)">🧬 Struktur</button>
     <button class="tool-btn" onclick="openPanel('info-panel')">ℹ Panduan</button>
     <button class="tool-btn" id="btn-filetree" onclick="toggleFileTree()">📁 Repo</button>
   </div></div>
@@ -342,6 +343,29 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <button class="tool-btn" onclick="hideFilePicker()" style="padding:0 8px;height:26px;font-size:11px">✕ Tutup</button>
     </div>
     <div style="padding:8px;overflow-y:auto;flex:1" id="filepick-list"></div>
+  </div>
+</div>
+
+<!-- STRUKTUR REPO -->
+<div id="struktur-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:110;display:none;align-items:flex-end" onclick="if(event.target===this)strukturTutup()">
+  <div style="background:var(--surface);border-radius:16px 16px 0 0;width:100%;height:80vh;display:flex;flex-direction:column">
+    <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="stk-title">🌳 Struktur</span>
+      <button class="tool-btn" onclick="strukturTutup()" style="padding:0 8px;height:26px;font-size:11px">✕ Tutup</button>
+    </div>
+    <div style="padding:8px 10px 0;display:flex;gap:6px;flex-shrink:0;flex-wrap:wrap">
+      <button class="tool-btn" onclick="strukturPilihFail()" style="padding:4px 10px;font-size:11px;border-color:var(--amber);color:var(--amber)">📁 Pilih Fail</button>
+      <button class="tool-btn" onclick="strukturFailEditor()" style="padding:4px 10px;font-size:11px">📝 Fail Editor</button>
+      <button class="tool-btn" onclick="strukturKeRepo()" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">🌳 Repo</button>
+      <input type="file" id="stk-file-input" accept=".html,.htm,.js,.css,.txt,.json,.md" style="display:none" onchange="strukturBacaFail(this)">
+    </div>
+    <div style="padding:8px 10px;display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
+      <input id="stk-filter" type="text" placeholder="Tapis (cth: .js, css/)" oninput="strukturRender()" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 10px;font-size:12px;outline:none">
+      <button class="tool-btn" id="stk-mode-btn" onclick="strukturTukarMod()" style="padding:4px 10px;font-size:11px">📄 Laluan</button>
+      <button class="tool-btn" onclick="strukturCopy()" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">📋 Copy</button>
+    </div>
+    <div id="stk-info" style="padding:0 12px 6px;font-size:11px;color:var(--text2);flex-shrink:0"></div>
+    <pre id="stk-out" style="flex:1;margin:0 10px 10px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:auto;font-family:monospace;font-size:11px;line-height:1.5;color:var(--text);white-space:pre;-webkit-user-select:text;user-select:text"></pre>
   </div>
 </div>
 
@@ -1247,6 +1271,7 @@ function ghRenderList(){
       '</div>'+
       '<button class="btn success" style="flex:1;padding:6px;opacity:'+(blocked?'0.5':'1')+';cursor:'+(blocked?'not-allowed':'pointer')+'" onclick="ghDeploy('+i+')" '+(blocked?'disabled':'')+'>🚀 Deploy</button>'+
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="ghBrowse('+i+')">📂</button>'+
+      '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="strukturBuka(\''+c.repo+'\',\''+(c.branch||'main')+'\')">🌳</button>'+
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--accent);color:var(--accent)" onclick="ghCheckStatus('+i+')">🔍</button>'+
       '<button class="btn amber" style="flex:none;padding:6px 10px" onclick="ghEditConfig('+i+')">✏</button>'+
       '<button class="btn danger" style="flex:none;padding:6px 10px" onclick="ghDeleteConfig('+i+')">🗑</button>'+
@@ -3064,6 +3089,7 @@ function multiRenderItemHTML(i){
         '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'single\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>🔄 Ganti</button>'+
         '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⚡ Ganti Pukal</button>'+
         '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
+        '<button class="tool-btn" onclick="strukturFailKad('+i+')" style="border-color:var(--green);color:var(--green)">🧬 Struktur</button>'+
         '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
         '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
         '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
@@ -3395,6 +3421,205 @@ function multiDownloadAll(){
     setTimeout(function(){ multiDownloadOne(i); },i*300);
   });
   showNotif('Memuat turun '+loaded.length+' app...','info');
+}
+
+// ═══════════════════════════════════
+// STRUKTUR REPO
+// ═══════════════════════════════════
+var _stk={repo:'',branch:'main',items:null,truncated:false,mode:'tree',src:'repo',outline:null,fileName:''};
+function strukturBuka(repo,branch){
+  _stk.src='repo';
+  _stk.repo=repo; _stk.branch=branch||'main'; _stk.items=null; _stk.truncated=false;
+  document.getElementById('stk-mode-btn').style.display='';
+  document.getElementById('stk-title').textContent='🌳 '+repo+' ('+_stk.branch+')';
+  document.getElementById('stk-filter').value='';
+  document.getElementById('stk-info').textContent='';
+  var out=document.getElementById('stk-out');
+  out.textContent='⏳ Memuatkan struktur...';
+  document.getElementById('stk-mode-btn').textContent=_stk.mode==='path'?'🌳 Pokok':'📄 Laluan';
+  document.getElementById('struktur-modal').style.display='flex';
+  var h={'Accept':'application/vnd.github.v3+json'};
+  var t=ghGetToken(); if(t) h['Authorization']='token '+t;
+  fetch('https://api.github.com/repos/'+repo+'/git/trees/'+encodeURIComponent(_stk.branch)+'?recursive=1',{headers:h})
+    .then(function(r){return r.json();})
+    .then(function(d){
+      if(!d||!Array.isArray(d.tree)){out.textContent='✕ '+((d&&d.message)||'Gagal muat struktur');return;}
+      _stk.items=d.tree.filter(function(x){return x.type==='blob'||x.type==='tree';});
+      _stk.truncated=!!d.truncated;
+      strukturRender();
+    })
+    .catch(function(e){out.textContent='✕ '+e.message;});
+}
+function strukturTutup(){
+  document.getElementById('struktur-modal').style.display='none';
+}
+function strukturTukarMod(){
+  _stk.mode=_stk.mode==='path'?'tree':'path';
+  strukturRender();
+}
+function strukturRender(){
+  if(_stk.src==='file'){strukturRenderFail();return;}
+  var out=document.getElementById('stk-out');
+  document.getElementById('stk-mode-btn').textContent=_stk.mode==='path'?'🌳 Pokok':'📄 Laluan';
+  if(!_stk.items) return;
+  var q=(document.getElementById('stk-filter').value||'').trim().toLowerCase();
+  var items=q?_stk.items.filter(function(x){return x.path.toLowerCase().indexOf(q)>=0;}):_stk.items;
+  var nD=0,nF=0;
+  items.forEach(function(x){ if(x.type==='tree') nD++; else nF++; });
+  var txt='';
+  if(_stk.mode==='path'){
+    txt=items.filter(function(x){return x.type==='blob';}).map(function(x){return x.path;}).sort().join('\n');
+  } else {
+    var root={d:{},f:[]};
+    items.forEach(function(x){
+      var parts=x.path.split('/'),n=root;
+      var upto=x.type==='blob'?parts.length-1:parts.length;
+      for(var k=0;k<upto;k++){ if(!n.d[parts[k]]) n.d[parts[k]]={d:{},f:[]}; n=n.d[parts[k]]; }
+      if(x.type==='blob') n.f.push(parts[parts.length-1]);
+    });
+    var lines=[(_stk.repo.split('/')[1]||_stk.repo)+'/'];
+    var walk=function(n,pre){
+      var all=Object.keys(n.d).sort().map(function(k){return {k:k,dir:true};})
+        .concat(n.f.slice().sort().map(function(k){return {k:k,dir:false};}));
+      all.forEach(function(e,idx){
+        var last=idx===all.length-1;
+        lines.push(pre+(last?'└── ':'├── ')+e.k+(e.dir?'/':''));
+        if(e.dir) walk(n.d[e.k],pre+(last?'    ':'│   '));
+      });
+    };
+    walk(root,'');
+    txt=lines.length>1?lines.join('\n'):'';
+  }
+  out.textContent=txt||'(Tiada padanan)';
+  document.getElementById('stk-info').textContent=nD+' folder · '+nF+' fail'+(_stk.truncated?' · ⚠ Repo terlalu besar, senarai terpotong':'');
+}
+function strukturAnalisis(teks,nama){
+  var L=teks.split('\n');
+  var ext=(nama||'').toLowerCase().split('.').pop();
+  var inStyle=ext==='css',inScript=ext==='js';
+  var bahagian=[],ids={},idOrder=[],kelas={},kelasOrder=[],fn={},fnOrder=[],kol={},kolOrder=[],luar=[];
+  var add=function(map,order,k,n){ if(map===fn&&k.length<2) return; if(!map[k]){map[k]=[];order.push(k);} map[k].push(n); };
+  var m,re;
+  for(var i=0;i<L.length;i++){
+    var s=L[i],n=i+1;
+    if(s.length>1500) continue;
+    if(/<style[\s>]/i.test(s)) inStyle=true;
+    if(/<script[\s>]/i.test(s)){
+      inScript=true;
+      m=s.match(/<script[^>]*\ssrc\s*=\s*["']([^"']+)["']/i); if(m) luar.push({n:n,t:'JS   '+m[1]});
+    }
+    m=s.match(/<link[^>]*\shref\s*=\s*["']([^"']+)["']/i); if(m) luar.push({n:n,t:'LINK '+m[1]});
+    re=/<!--\s*([\s\S]*?)\s*-->/g;
+    while((m=re.exec(s))){ var c=m[1]; if(c&&c.length<=80&&!/[<>=;{}]/.test(c)) bahagian.push({n:n,t:c}); }
+    if(inScript){
+      m=s.match(/^\s*\/\/\s*([A-Z][A-Z0-9 _\-\/&()]{2,60})\s*$/); if(m) bahagian.push({n:n,t:'JS · '+m[1].trim()});
+      re=/function\s+([\w$]+)\s*\(/g; while((m=re.exec(s))) add(fn,fnOrder,m[1],n);
+      re=/(?:var|let|const)\s+([\w$]+)\s*=\s*(?:async\s+)?(?:function\b|\([^()]*\)\s*=>|[\w$]+\s*=>)/g; while((m=re.exec(s))) add(fn,fnOrder,m[1],n);
+      re=/window\.([\w$]+)\s*=\s*(?:async\s+)?function\b/g; while((m=re.exec(s))) add(fn,fnOrder,m[1],n);
+      re=/\.collection\(\s*['"]([^'"]+)['"]/g; while((m=re.exec(s))) add(kol,kolOrder,m[1],n);
+    } else if(inStyle){
+      if(s.indexOf('{')>=0){
+        var sel=s.split('{')[0];
+        re=/\.([a-zA-Z_][\w-]*)/g; while((m=re.exec(sel))) if(!kelas[m[1]]) add(kelas,kelasOrder,m[1],n);
+      }
+    } else {
+      re=/\sid\s*=\s*["']([^"'\s]+)["']/g; while((m=re.exec(s))) add(ids,idOrder,m[1],n);
+    }
+    if(/<\/style>/i.test(s)) inStyle=false;
+    if(/<\/script>/i.test(s)) inScript=false;
+  }
+  var dupFn=fnOrder.filter(function(k){return fn[k].length>1;});
+  var dupId=idOrder.filter(function(k){return ids[k].length>1;});
+  var seksyen=[];
+  seksyen.push({tajuk:'📌 BAHAGIAN',rows:bahagian});
+  if(dupFn.length) seksyen.push({tajuk:'⚠ FUNGSI PENDUA (yang terakhir menang)',rows:dupFn.map(function(k){return {n:fn[k][0],t:k+'()  ×'+fn[k].length+'  → L'+fn[k].join(', L')};})});
+  seksyen.push({tajuk:'⚙ FUNGSI JS',rows:fnOrder.map(function(k){return {n:fn[k][0],t:k+'()'+(fn[k].length>1?'  ⚠×'+fn[k].length:'')};})});
+  seksyen.push({tajuk:'🔥 FIREBASE COLLECTION',rows:kolOrder.map(function(k){return {n:kol[k][0],t:k+'  ×'+kol[k].length};})});
+  if(dupId.length) seksyen.push({tajuk:'⚠ ID PENDUA',rows:dupId.map(function(k){return {n:ids[k][0],t:'#'+k+'  ×'+ids[k].length+'  → L'+ids[k].join(', L')};})});
+  seksyen.push({tajuk:'🧱 ID ELEMEN',rows:idOrder.map(function(k){return {n:ids[k][0],t:'#'+k};})});
+  seksyen.push({tajuk:'🎨 KELAS CSS',rows:kelasOrder.map(function(k){return {n:kelas[k][0],t:'.'+k};})});
+  seksyen.push({tajuk:'📦 FAIL LUARAN',rows:luar});
+  return {
+    jumlah:L.length,seksyen:seksyen,
+    ringkas:L.length+' baris · '+fnOrder.length+' fungsi · '+idOrder.length+' ID · '+kolOrder.length+' collection'+(dupFn.length?' · ⚠ '+dupFn.length+' fungsi pendua':'')
+  };
+}
+function strukturFail(nama,teks,repo,branch){
+  _stk.src='file'; _stk.fileName=nama||'Fail';
+  _stk.repo=repo||''; _stk.branch=branch||'main';
+  _stk.outline=strukturAnalisis(teks,_stk.fileName);
+  document.getElementById('stk-title').textContent='🧬 '+_stk.fileName+(_stk.repo?' ('+_stk.repo+')':'');
+  document.getElementById('stk-filter').value='';
+  document.getElementById('stk-mode-btn').style.display='none';
+  document.getElementById('struktur-modal').style.display='flex';
+  strukturRender();
+}
+function strukturRenderFail(){
+  var out=document.getElementById('stk-out'),o=_stk.outline;
+  if(!o) return;
+  var q=(document.getElementById('stk-filter').value||'').trim().toLowerCase();
+  var w=String(o.jumlah).length+1;
+  var pad=function(n){var s='L'+n;while(s.length<w)s+=' ';return s+'  ';};
+  var lines=['🧬 '+_stk.fileName+' — '+o.jumlah+' baris'],shown=0;
+  o.seksyen.forEach(function(sx){
+    var rows=sx.rows.filter(function(r){return !q||r.t.toLowerCase().indexOf(q)>=0;});
+    if(!rows.length) return;
+    lines.push('');
+    lines.push('━━ '+sx.tajuk+' ('+rows.length+')');
+    rows.forEach(function(r){lines.push((r.n?pad(r.n):'')+r.t);});
+    shown+=rows.length;
+  });
+  out.textContent=shown?lines.join('\n'):'(Tiada padanan)';
+  document.getElementById('stk-info').textContent=o.ringkas;
+}
+function strukturModalKosong(){
+  _stk.src='file'; _stk.outline=null; _stk.repo=S.fileRepo||''; _stk.branch=S.fileBranch||'main';
+  document.getElementById('stk-title').textContent='🧬 Struktur Fail';
+  document.getElementById('stk-filter').value='';
+  document.getElementById('stk-mode-btn').style.display='none';
+  document.getElementById('stk-info').textContent='';
+  document.getElementById('stk-out').textContent='Tekan 📁 Pilih Fail untuk baca struktur mana-mana fail.';
+  document.getElementById('struktur-modal').style.display='flex';
+}
+function strukturFailEditor(){
+  var t=inp().value;
+  if(!t.trim()){strukturModalKosong();return;}
+  strukturFail(S.fileName||'Editor',t,S.fileRepo,S.fileBranch);
+}
+function strukturFailKad(i){
+  var mf=_multiFiles[i];
+  if(!mf||!mf.loaded){showNotif('Tunggu fail dimuat dahulu','err');return;}
+  strukturFail(mf.config.path.split('/').pop(),getMultiCardContent(i),mf.config.repo,mf.config.branch);
+}
+function strukturPilihFail(){
+  document.getElementById('stk-file-input').click();
+}
+function strukturBacaFail(el){
+  var f=el.files&&el.files[0]; if(!f) return;
+  var r=new FileReader();
+  r.onload=function(){ strukturFail(f.name,String(r.result||''),'',''); };
+  r.onerror=function(){ showNotif('Gagal baca fail','err'); };
+  r.readAsText(f);
+  el.value='';
+}
+function strukturKeRepo(){
+  if(!_stk.repo){showNotif('Fail ini tiada repo GitHub','err');return;}
+  strukturBuka(_stk.repo,_stk.branch);
+}
+function strukturCopy(){
+  if(_stk.src==='file'?!_stk.outline:!_stk.items){showNotif('Struktur belum dimuat','err');return;}
+  var txt=document.getElementById('stk-out').textContent;
+  var done=function(){showNotif('📋 Struktur disalin!','ok');};
+  var fallback=function(){
+    var ta=document.createElement('textarea');
+    ta.value=txt; ta.setAttribute('readonly','readonly');
+    ta.style.cssText='position:fixed;top:-9999px;left:0;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    try{document.execCommand('copy');done();}catch(e){showNotif('Gagal salin','err');}
+    document.body.removeChild(ta);
+  };
+  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(txt).then(done).catch(fallback);}
+  else fallback();
 }
 
 // ═══════════════════════════════════
