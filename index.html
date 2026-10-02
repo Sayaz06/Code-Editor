@@ -1387,7 +1387,7 @@ function ghRenderList(){
   var nTersembunyi=list.filter(function(c){return c.hidden;}).length;
   if(!list.length||nTersembunyi===list.length&&!_ghShowHidden){
     el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app lagi. Tekan 🔄 Segerak dari GitHub.</div>'+
-      (nTersembunyi?'<div style="text-align:center"><button class="tool-btn" onclick="_ghShowHidden=true;ghRenderList()" style="padding:4px 10px;font-size:11px">👁 Tunjuk tersembunyi ('+nTersembunyi+')</button></div>':'');
+      (nTersembunyi?'<div style="text-align:center"><button class="tool-btn" onclick="_ghShowHidden=true;ghRenderList()" style="padding:4px 10px;font-size:11px">🗑 Lihat yang dibuang ('+nTersembunyi+')</button></div>':'');
     return;
   }
   var html='';
@@ -1396,7 +1396,7 @@ function ghRenderList(){
       if(!_ghShowHidden) return;
       html+='<div class="file-item" style="flex-wrap:wrap;gap:6px;opacity:0.6">'+
         '<div class="file-info" style="flex:1;min-width:0">'+
-          '<div class="file-name">🙈 '+c.name+'</div>'+
+          '<div class="file-name">🗑 '+c.name+'</div>'+
           '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
         '</div>'+
         '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="ghUnhideConfig('+i+')">↺ Papar</button>'+
@@ -1416,12 +1416,12 @@ function ghRenderList(){
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="strukturBuka(\''+c.repo+'\',\''+(c.branch||'main')+'\')">🌳</button>'+
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--accent);color:var(--accent)" onclick="ghCheckStatus('+i+')">🔍</button>'+
       '<button class="btn amber" style="flex:none;padding:6px 10px" onclick="ghEditConfig('+i+')">✏</button>'+
-      '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--text2);color:var(--text2)" onclick="ghDeleteConfig('+i+')" title="Sembunyikan">🙈</button>'+
+      '<button class="btn danger" style="flex:none;padding:6px 10px" onclick="ghDeleteConfig('+i+')" title="Buang dari senarai">🗑</button>'+
     '</div>';
   });
   if(nTersembunyi){
     html+='<div style="text-align:center;margin-top:6px"><button class="tool-btn" onclick="_ghShowHidden=!_ghShowHidden;ghRenderList()" style="padding:4px 10px;font-size:11px">'+
-      (_ghShowHidden?'🙈 Sorok yang tersembunyi':'👁 Tunjuk tersembunyi ('+nTersembunyi+')')+'</button></div>';
+      (_ghShowHidden?'Sorok senarai yang dibuang':'🗑 Lihat yang dibuang ('+nTersembunyi+')')+'</button></div>';
   }
   el.innerHTML=html;
 }
@@ -1446,12 +1446,16 @@ function ghEditConfig(idx){
 
 function ghDeleteConfig(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
-  if(!confirm('Sembunyikan "'+c.name+'" dari senarai?\n\n(Repo di GitHub tidak terjejas. Boleh dipapar semula melalui 👁 Tunjuk tersembunyi.)')) return;
+  if(!confirm('Buang "'+c.name+'" dari senarai Deploy?\n\nRepo di GitHub TIDAK dipadam. Segerak tidak akan menambahnya semula.\n(Boleh dikembalikan melalui 🗑 Lihat yang dibuang → ↺ Papar)')) return;
   c.hidden=true;
   _ghConfigs=list;
+  _ghShowHidden=false;
   ghSaveToFirebase().then(function(){
-    ghRenderList(); showNotif('🙈 '+c.name+' disembunyikan','ok');
-  }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
+    ghRenderList(); showNotif('🗑 '+c.name+' dibuang dari senarai','ok');
+  }).catch(function(e){
+    delete c.hidden; ghRenderList();
+    showNotif('Gagal simpan ke Firebase: '+e.message,'err');
+  });
 }
 
 function ghUnhideConfig(idx){
