@@ -4332,6 +4332,12 @@ async function zfCloudMula(){
   var btn=document.getElementById('zf-btn-cloud');
   btn.disabled=true; btn.textContent='⏳ Menghantar...';
   try{
+    var sumber=await impApi('GET','/repos/'+_zf.repo).catch(function(){return null;});
+    if(sumber&&sumber.private){
+      zfLog('✕ '+_zf.repo+' ialah repo PRIVATE. ☁ GitHub tidak boleh clone repo private, dan hasil ZIP akan terdedah dalam Release public. Guna ▶ Mula (proses di phone) untuk repo ini.','err');
+      showNotif('Repo private — guna ▶ Mula','err');
+      return;
+    }
     var info=await impApi('GET','/repos/'+w);
     if(info.private) zfLog('⚠ Repo pekerja private — pautan muat turun mungkin tak boleh dibuka dari phone. Disyorkan public.','warn');
     await impApi('POST','/repos/'+w+'/actions/workflows/'+_zfc.wf+'/dispatches',{
