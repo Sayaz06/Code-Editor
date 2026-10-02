@@ -340,8 +340,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 <div id="multi-filepick" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:110;display:none;align-items:flex-end" onclick="if(event.target===this)hideFilePicker()">
   <div style="background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:72vh;display:flex;flex-direction:column">
     <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
-      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1" id="filepick-title">Pilih Fail</span>
-      <button class="tool-btn" onclick="hideFilePicker()" style="padding:0 8px;height:26px;font-size:11px">✕ Tutup</button>
+      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="filepick-title">Pilih Fail</span>
+      <button class="tool-btn" onclick="fpMuatTurunSemua()" style="padding:0 8px;height:26px;font-size:11px;border-color:var(--accent2);color:var(--accent2);flex-shrink:0">⬇ Semua</button>
+      <button class="tool-btn" onclick="hideFilePicker()" style="padding:0 8px;height:26px;font-size:11px;flex-shrink:0">✕ Tutup</button>
     </div>
     <div style="padding:8px;overflow-y:auto;flex:1" id="filepick-list"></div>
   </div>
@@ -3419,7 +3420,18 @@ function hideFilePicker(){
   var el=document.getElementById('multi-filepick');
   if(el)el.style.display='none';
 }
+var _fpPath='';
+function fpMuatTurunSemua(){
+  var mf=_multiFiles[_fpCardIdx];
+  if(!mf){showNotif('Pilih app dahulu','err');return;}
+  var c=mf.config;
+  hideFilePicker();
+  showNotif('⏳ Membaca struktur '+c.repo+(_fpPath?'/'+_fpPath:'')+'...','info');
+  strukturBuka(c.repo,c.branch||'',_fpPath);
+  _stk.lepasMuat=zfBuka;
+}
 function fpBrowse(cardIdx,path){
+  _fpPath=path||'';
   var mf=_multiFiles[cardIdx]; if(!mf) return;
   var c=mf.config;
   var list=document.getElementById('filepick-list');
@@ -3628,7 +3640,7 @@ function multiDownloadAll(){
 // ═══════════════════════════════════
 var _stk={repo:'',branch:'main',items:null,truncated:false,mode:'tree',src:'repo',outline:null,fileName:''};
 function strukturBuka(repo,branch,subpath){
-  _stk.src='repo';
+  _stk.src='repo'; _stk.lepasMuat=null;
   _stk.repo=repo; _stk.branch=branch||''; _stk.items=null; _stk.truncated=false;
   _stk.sub=(subpath||'').replace(/^\/+|\/+$/g,'');
   document.getElementById('stk-mode-btn').style.display='';
@@ -3669,8 +3681,9 @@ function strukturBuka(repo,branch,subpath){
       _stk.items=items;
       _stk.truncated=!!d.truncated;
       strukturRender();
+      if(_stk.lepasMuat){var lm=_stk.lepasMuat;_stk.lepasMuat=null;lm();}
     })
-    .catch(function(e){out.textContent='✕ '+e.message;});
+    .catch(function(e){out.textContent='✕ '+e.message;_stk.lepasMuat=null;});
 }
 function strukturDariInput(){
   var v=(document.getElementById('stk-repo-input').value||'').trim();
