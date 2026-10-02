@@ -381,6 +381,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <button class="tool-btn" onclick="strukturCopy()" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">📋 Copy</button>
       <button class="tool-btn" onclick="strukturCopyBlok()" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)">``` Copy</button>
       <button class="tool-btn" onclick="strukturDownloadTxt()" style="padding:4px 10px;font-size:11px;border-color:var(--amber);color:var(--amber)">⬇ TXT</button>
+      <button class="tool-btn" onclick="zfBuka()" style="padding:4px 10px;font-size:11px;border-color:var(--accent2);color:var(--accent2)">⬇ ZIP</button>
     </div>
     <div id="stk-info" style="padding:0 12px 6px;font-size:11px;color:var(--text2);flex-shrink:0"></div>
     <pre id="stk-out" style="flex:1;margin:0 10px 10px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:auto;font-family:monospace;font-size:11px;line-height:1.5;color:var(--text);white-space:pre;-webkit-user-select:text;user-select:text"></pre>
@@ -437,6 +438,41 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       </div>
       <div id="imp-log" style="max-height:22vh;overflow-y:auto;margin-bottom:8px"></div>
       <pre id="imp-list" style="display:none;margin:0;padding:8px;max-height:28vh;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:10px;line-height:1.5;color:var(--text2);white-space:pre"></pre>
+    </div>
+  </div>
+</div>
+
+<!-- ZIP FLAT -->
+<div id="zipflat-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:112;display:none;align-items:flex-end" onclick="if(event.target===this)zfTutup()">
+  <div style="background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:88vh;display:flex;flex-direction:column">
+    <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span id="zf-title" style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⬇ ZIP</span>
+      <button class="tool-btn" onclick="zfTutup()" style="padding:0 8px;height:26px;font-size:11px">✕ Tutup</button>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:12px 14px">
+      <div id="zf-ringkas" style="font-size:12px;color:var(--text);line-height:1.6;margin-bottom:10px"></div>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text);margin-bottom:8px"><input type="checkbox" id="zf-flat" checked style="margin-top:2px"> <span>Flatten — semua fail naik ke atas (tiada folder)</span></label>
+      <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text);margin-bottom:8px"><input type="checkbox" id="zf-storage" style="margin-top:2px"> <span>Simpan ke Firebase Storage dulu<br><span style="color:var(--text2);font-size:11px">Untuk repo besar · jimat RAM · boleh sambung jika terputus</span></span></label>
+      <div class="field-label">Pecah ZIP</div>
+      <select id="zf-part" class="field field-sm" style="margin-bottom:10px">
+        <option value="0">Satu ZIP sahaja</option>
+        <option value="25">Pecah setiap 25MB</option>
+        <option value="50">Pecah setiap 50MB</option>
+        <option value="100">Pecah setiap 100MB</option>
+      </select>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn success" id="zf-btn-mula" onclick="zfMula()">▶ Mula</button>
+        <button class="btn danger" id="zf-btn-batal" onclick="zfBatal()" style="display:none;flex:none">✕ Batal</button>
+        <button class="btn" id="zf-btn-cache" onclick="zfPadamCache()" style="flex:none;border-color:var(--red);color:var(--red)">🗑 Padam Cache</button>
+      </div>
+      <div id="zf-prog-wrap" style="display:none;margin-bottom:8px">
+        <div id="zf-prog-tahap" style="font-size:11px;color:var(--accent);margin-bottom:4px;font-weight:600"></div>
+        <div style="height:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+          <div id="zf-prog-bar" style="height:100%;width:0;background:var(--green);transition:width .2s"></div>
+        </div>
+        <div id="zf-prog-txt" style="font-size:11px;color:var(--text2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      </div>
+      <div id="zf-log" style="max-height:30vh;overflow-y:auto"></div>
     </div>
   </div>
 </div>
@@ -3535,7 +3571,7 @@ function strukturBuka(repo,branch,subpath){
       if(_stk.sub){
         var pre=_stk.sub+'/';
         items=items.filter(function(x){return x.path.indexOf(pre)===0;})
-          .map(function(x){return {path:x.path.slice(pre.length),type:x.type};});
+          .map(function(x){return {path:x.path.slice(pre.length),type:x.type,size:x.size||0};});
         if(!items.length){out.textContent='✕ Folder "'+_stk.sub+'" tidak dijumpai';return;}
       }
       _stk.items=items;
@@ -3916,6 +3952,230 @@ function impDeploy(){
   }).then(function(){
     impKunci(false);
   });
+}
+
+// ═══════════════════════════════════
+// ZIP FLAT — muat turun repo sebagai ZIP
+// ═══════════════════════════════════
+var _zf={busy:false,batal:false,list:null,repo:'',branch:'',sub:'',jobId:''};
+function zfSaiz(b){ b=b||0; return b>=1048576?(b/1048576).toFixed(1)+'MB':b>=1024?Math.round(b/1024)+'KB':b+'B'; }
+function zfFlatNames(paths){
+  var used={'_peta_fail.txt':1},out=[];
+  paths.forEach(function(p){
+    var nm=p.split('/').pop(),key=nm.toLowerCase();
+    if(!used[key]){used[key]=1;out.push(nm);return;}
+    var di=nm.lastIndexOf('.'),b=di>0?nm.slice(0,di):nm,e=di>0?nm.slice(di):'',k=2,cand;
+    do{cand=b+' ('+k+')'+e;k++;}while(used[cand.toLowerCase()]);
+    used[cand.toLowerCase()]=1; out.push(cand);
+  });
+  return out;
+}
+function zfBuka(){
+  if(_stk.src!=='repo'||!_stk.items){showNotif('Buka struktur repo GitHub dahulu (🌳 Lihat)','err');return;}
+  if(_zf.busy){document.getElementById('zipflat-modal').style.display='flex';return;}
+  var q=(document.getElementById('stk-filter').value||'').trim().toLowerCase();
+  var blobs=_stk.items.filter(function(x){return x.type==='blob'&&(!q||x.path.toLowerCase().indexOf(q)>=0);});
+  if(!blobs.length){showNotif('Tiada fail untuk dimuat turun','err');return;}
+  var flat=zfFlatNames(blobs.map(function(x){return x.path;}));
+  var sub=_stk.sub?_stk.sub+'/':'';
+  _zf.repo=_stk.repo; _zf.branch=_stk.branch; _zf.sub=_stk.sub||'';
+  _zf.list=blobs.map(function(x,i){return {path:x.path,full:sub+x.path,size:x.size||0,flat:flat[i]};});
+  var total=_zf.list.reduce(function(s,f){return s+f.size;},0);
+  var sama=_zf.list.filter(function(f){return f.flat!==f.path.split('/').pop();}).length;
+  _zf.jobId=(_zf.repo+'_'+_zf.branch+'_'+(_zf.sub||'root')+'_'+(q||'semua')+'_'+_zf.list.length).replace(/[^\w.-]+/g,'_').slice(0,120);
+  var besar=total>80*1048576||_zf.list.length>1500;
+  document.getElementById('zf-title').textContent='⬇ ZIP — '+_zf.repo+(_zf.sub?'/'+_zf.sub:'');
+  document.getElementById('zf-ringkas').innerHTML=
+    '<b>'+_zf.list.length+'</b> fail · <b>'+zfSaiz(total)+'</b>'+(q?' · tapisan "'+q.replace(/</g,'&lt;')+'"':'')+
+    (sama?'<br><span style="color:var(--amber)">⚠ '+sama+' fail nama sama — akan dinamakan semula "(2)", "(3)"... Senarai asal dalam _PETA_FAIL.txt</span>':'')+
+    (besar?'<br><span style="color:var(--amber)">⚠ Repo besar — disyorkan guna Firebase Storage & pecah ZIP</span>':'');
+  document.getElementById('zf-storage').checked=besar;
+  document.getElementById('zf-part').value=besar?'50':'0';
+  document.getElementById('zf-log').innerHTML='';
+  document.getElementById('zf-prog-wrap').style.display='none';
+  document.getElementById('zipflat-modal').style.display='flex';
+}
+function zfTutup(){
+  if(_zf.busy){document.getElementById('zipflat-modal').style.display='none';showNotif('ZIP masih berjalan di latar belakang','info');return;}
+  document.getElementById('zipflat-modal').style.display='none';
+}
+function zfLog(msg,type){
+  var el=document.getElementById('zf-log');
+  var c=type==='ok'?'var(--green)':type==='err'?'var(--red)':type==='warn'?'var(--amber)':'var(--text2)';
+  var d=document.createElement('div');
+  d.style.cssText='color:'+c+';font-size:11px;line-height:1.5;word-break:break-all';
+  d.textContent=msg; el.appendChild(d); el.scrollTop=el.scrollHeight;
+}
+function zfProg(tahap,done,total,label){
+  document.getElementById('zf-prog-wrap').style.display='block';
+  var pct=total?Math.min(100,Math.round(done/total*100)):0;
+  document.getElementById('zf-prog-tahap').textContent=tahap;
+  document.getElementById('zf-prog-bar').style.width=pct+'%';
+  document.getElementById('zf-prog-txt').textContent=done+'/'+total+' ('+pct+'%)'+(label?' · '+label:'');
+}
+function zfKunci(on){
+  _zf.busy=on;
+  document.getElementById('zf-btn-mula').disabled=on;
+  document.getElementById('zf-btn-cache').disabled=on;
+  document.getElementById('zf-btn-batal').style.display=on?'':'none';
+}
+function zfBatal(){ if(_zf.busy){_zf.batal=true;zfLog('Membatalkan...','warn');} }
+function zfRawUrl(f){
+  var p=f.full.split('/').map(encodeURIComponent).join('/');
+  return 'https://raw.githubusercontent.com/'+_zf.repo+'/'+encodeURIComponent(_zf.branch)+'/'+p;
+}
+async function zfAmbilGitHub(f){
+  var r=await fetch(zfRawUrl(f));
+  if(r.ok) return await r.blob();
+  var t=ghGetToken();
+  if(!t) throw new Error(f.path+': HTTP '+r.status);
+  var p=f.full.split('/').map(encodeURIComponent).join('/');
+  var r2=await fetch('https://api.github.com/repos/'+_zf.repo+'/contents/'+p+'?ref='+encodeURIComponent(_zf.branch),
+    {headers:{'Authorization':'token '+t,'Accept':'application/vnd.github.raw'}});
+  if(!r2.ok) throw new Error(f.path+': HTTP '+r2.status);
+  return await r2.blob();
+}
+function zfCacheFolder(){ return 'users/'+currentUser.uid+'/zipcache/'+_zf.jobId; }
+async function zfCuba(fn,kali){
+  for(var k=0;;k++){
+    try{ return await fn(); }
+    catch(e){
+      if(k>=kali||_zf.batal) throw e;
+      await new Promise(function(res){setTimeout(res,1500*(k+1));});
+    }
+  }
+}
+async function zfPool(n,jumlah,kerja){
+  var idx=0,ralat=null;
+  var pekerja=async function(){
+    while(!ralat&&idx<jumlah){
+      if(_zf.batal) throw new Error('Dibatalkan');
+      var i=idx++;
+      try{ await kerja(i); }catch(e){ ralat=e; throw e; }
+    }
+  };
+  var ps=[]; for(var k=0;k<n;k++) ps.push(pekerja());
+  await Promise.all(ps);
+}
+function zfMuatTurunBlob(blob,nama){
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download=nama;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},4000);
+}
+async function zfMula(){
+  if(_zf.busy||!_zf.list) return;
+  var list=_zf.list,N=list.length;
+  var flat=document.getElementById('zf-flat').checked;
+  var guna=document.getElementById('zf-storage').checked;
+  var partMB=parseInt(document.getElementById('zf-part').value,10)||0;
+  if(guna&&!currentUser){showNotif('Log masuk dahulu untuk guna Firebase Storage','err');return;}
+  _zf.batal=false; zfKunci(true);
+  document.getElementById('zf-log').innerHTML='';
+  var data=new Array(N);
+  try{
+    await impMuatJSZip();
+    // ── TAHAP 1: MUAT TURUN SATU-SATU ──
+    var siap={};
+    if(guna){
+      zfLog('Semak cache Firebase Storage...');
+      try{
+        var ls=await storage.ref(zfCacheFolder()).listAll();
+        ls.items.forEach(function(it){siap[it.name]=1;});
+      }catch(e){ zfLog('⚠ Tak dapat baca cache: '+(e.code||e.message),'warn'); }
+      var ada=Object.keys(siap).length;
+      if(ada) zfLog('↺ Sambung: '+ada+' fail sudah ada dalam Storage','ok');
+    }
+    var done=0,bytes=0;
+    for(var s in siap) if(siap.hasOwnProperty(s)) done++;
+    zfProg('1/2 Muat turun',done,N,'');
+    await zfPool(4,N,async function(i){
+      var f=list[i];
+      if(guna&&siap[String(i)]) return;
+      var blob=await zfCuba(function(){return zfAmbilGitHub(f);},2);
+      if(guna){
+        await zfCuba(function(){return storage.ref(zfCacheFolder()+'/'+i).put(blob);},2);
+      } else {
+        data[i]=blob;
+      }
+      done++; bytes+=blob.size;
+      zfProg('1/2 Muat turun',done,N,zfSaiz(bytes)+' · '+f.path.split('/').pop());
+    });
+    zfLog('✓ Semua '+N+' fail dimuat turun','ok');
+    // ── TAHAP 2: BINA ZIP ──
+    var had=partMB?partMB*1048576:0;
+    var asas=(_zf.repo.split('/')[1]||'repo')+(_zf.sub?'-'+_zf.sub.replace(/\//g,'-'):'')+(flat?'-flat':'');
+    asas=asas.replace(/[^\w.\-]+/g,'_');
+    var zip=new JSZip(),cur=0,bahagian=1,dalamZip=0;
+    var peta=list.map(function(f){return (flat?f.flat:f.path)+'  ←  '+f.path;}).join('\n');
+    zip.file('_PETA_FAIL.txt','Sumber: https://github.com/'+_zf.repo+'/tree/'+_zf.branch+(_zf.sub?'/'+_zf.sub:'')+'\nJumlah: '+N+' fail\n\n'+peta);
+    var jana=async function(akhir){
+      var nama=asas+((had&&!(akhir&&bahagian===1))?'-bahagian'+bahagian:'')+'.zip';
+      zfLog('Membina '+nama+' ('+dalamZip+' fail)...');
+      var out=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5},streamFiles:true},function(m){
+        document.getElementById('zf-prog-txt').textContent='Memampat '+nama+' · '+Math.round(m.percent)+'%';
+      });
+      zfMuatTurunBlob(out,nama);
+      zfLog('⬇ '+nama+' · '+zfSaiz(out.size),'ok');
+      bahagian++; zip=new JSZip(); cur=0; dalamZip=0;
+      await new Promise(function(res){setTimeout(res,800);});
+    };
+    for(var i=0;i<N;i++){
+      if(_zf.batal) throw new Error('Dibatalkan');
+      var f=list[i],b;
+      if(guna){
+        b=await zfCuba(async function(){
+          var url=await storage.ref(zfCacheFolder()+'/'+i).getDownloadURL();
+          var r=await fetch(url);
+          if(!r.ok) throw new Error('Storage HTTP '+r.status);
+          return await r.blob();
+        },2);
+      } else { b=data[i]; data[i]=null; }
+      if(had&&cur>0&&cur+b.size>had) await jana(false);
+      zip.file(flat?f.flat:f.path,await b.arrayBuffer(),{binary:true});
+      cur+=b.size; dalamZip++;
+      zfProg('2/2 Bina ZIP',i+1,N,f.path.split('/').pop());
+    }
+    if(dalamZip>0||bahagian===1) await jana(true);
+    zfLog('✓ SIAP! '+(bahagian-1)+' fail ZIP dimuat turun','ok');
+    if(guna) zfLog('Tip: tekan 🗑 Padam Cache untuk kosongkan Firebase Storage','warn');
+    showNotif('✓ ZIP siap','ok');
+  }catch(e){
+    var m=e.message||String(e);
+    if(e.code==='storage/unauthorized') m+=' — semak Storage Rules: benarkan users/{uid}/zipcache/**';
+    if(/Failed to fetch/i.test(m)&&guna) m+=' — mungkin CORS bucket Storage belum diset';
+    zfLog('✕ '+m+(guna?' · cache disimpan, tekan ▶ Mula untuk sambung':''),'err');
+    showNotif('ZIP gagal','err');
+  }finally{
+    data=null;
+    zfKunci(false);
+  }
+}
+async function zfPadamCache(){
+  if(_zf.busy) return;
+  if(!currentUser){showNotif('Log masuk dahulu','err');return;}
+  if(!confirm('Padam SEMUA cache ZIP dalam Firebase Storage?')) return;
+  _zf.batal=false; zfKunci(true);
+  try{
+    var root=await storage.ref('users/'+currentUser.uid+'/zipcache').listAll();
+    var items=[];
+    for(var k=0;k<root.prefixes.length;k++){
+      var r=await root.prefixes[k].listAll();
+      items=items.concat(r.items);
+    }
+    items=items.concat(root.items);
+    if(!items.length){zfLog('Cache sudah kosong','ok');return;}
+    var n=0;
+    await zfPool(6,items.length,async function(i){
+      await items[i].delete().catch(function(){});
+      n++; zfProg('Padam cache',n,items.length,'');
+    });
+    zfLog('✓ '+items.length+' fail cache dipadam','ok');
+  }catch(e){
+    zfLog('✕ '+(e.message||e),'err');
+  }finally{
+    zfKunci(false);
+  }
 }
 function strukturRender(){
   if(_stk.src==='file'){strukturRenderFail();return;}
