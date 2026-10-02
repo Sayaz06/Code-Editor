@@ -248,6 +248,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <button class="tool-btn" onclick="copyAll()">📋 Salin Semua</button>
     <button class="tool-btn" onclick="pasteAll()">📥 Tampal Semua</button>
     <button class="tool-btn" onclick="strukturFailEditor()" style="border-color:var(--green);color:var(--green)">🧬 Struktur</button>
+    <button class="tool-btn" onclick="impBuka()" style="border-color:var(--accent2);color:var(--accent2)">📥 Import</button>
     <button class="tool-btn" onclick="openPanel('info-panel')">ℹ Panduan</button>
     <button class="tool-btn" id="btn-filetree" onclick="toggleFileTree()">📁 Repo</button>
   </div></div>
@@ -357,6 +358,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <button class="tool-btn" onclick="strukturPilihFail()" style="padding:4px 10px;font-size:11px;border-color:var(--amber);color:var(--amber)">📁 Pilih Fail</button>
       <button class="tool-btn" onclick="strukturFailEditor()" style="padding:4px 10px;font-size:11px">📝 Fail Editor</button>
       <button class="tool-btn" onclick="strukturKeRepo()" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">🌳 Repo</button>
+      <button class="tool-btn" onclick="impBukaDariStruktur()" style="padding:4px 10px;font-size:11px;border-color:var(--accent2);color:var(--accent2)">📥 Klon</button>
       <input type="file" id="stk-file-input" accept=".html,.htm,.js,.css,.txt,.json,.md" style="display:none" onchange="strukturBacaFail(this)">
     </div>
     <div style="padding:8px 10px 0;display:flex;gap:6px;flex-shrink:0;align-items:center">
@@ -382,6 +384,60 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     </div>
     <div id="stk-info" style="padding:0 12px 6px;font-size:11px;color:var(--text2);flex-shrink:0"></div>
     <pre id="stk-out" style="flex:1;margin:0 10px 10px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:auto;font-family:monospace;font-size:11px;line-height:1.5;color:var(--text);white-space:pre;-webkit-user-select:text;user-select:text"></pre>
+  </div>
+</div>
+
+<!-- IMPORT REPO / ZIP -->
+<div id="import-modal" style="position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:111;display:none;align-items:flex-end" onclick="if(event.target===this)impTutup()">
+  <div style="background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:92vh;display:flex;flex-direction:column">
+    <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
+      <span style="font-size:13px;font-weight:600;color:var(--text);flex:1">📥 Import ke Repo Saya</span>
+      <button class="tool-btn" onclick="impTutup()" style="padding:0 8px;height:26px;font-size:11px">✕ Tutup</button>
+    </div>
+    <div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
+      <div class="nav-tab active" id="imp-tab-repo" onclick="impTab('repo')">🔗 Repo GitHub</div>
+      <div class="nav-tab" id="imp-tab-zip" onclick="impTab('zip')">📦 ZIP</div>
+    </div>
+    <div style="overflow-y:auto;flex:1;padding:12px 14px">
+      <div id="imp-view-repo">
+        <div class="field-label">Repo sumber (public) — boleh link folder</div>
+        <input id="imp-src" class="field field-sm" type="text" placeholder="owner/repo atau https://github.com/..." oninput="impResetHasil()" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-bottom:10px">
+      </div>
+      <div id="imp-view-zip" style="display:none">
+        <div class="field-label">Fail ZIP</div>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:6px">
+          <button class="btn" onclick="document.getElementById('imp-zip-input').click()" style="flex:none;padding:8px 12px">📦 Pilih ZIP</button>
+          <span id="imp-zip-name" style="font-size:12px;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Belum pilih</span>
+          <input type="file" id="imp-zip-input" accept=".zip,application/zip" style="display:none" onchange="impPilihZip(this)">
+        </div>
+        <label style="display:flex;gap:6px;align-items:center;font-size:12px;color:var(--text2);margin-bottom:10px"><input type="checkbox" id="imp-strip" checked onchange="impResetHasil()"> Buang folder teratas (cth: repo-main/)</label>
+      </div>
+      <div class="field-label">Repo sasaran (milik awak)</div>
+      <input id="imp-tgt" class="field field-sm" type="text" list="imp-tgt-list" placeholder="owner/nama-repo" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-bottom:8px">
+      <datalist id="imp-tgt-list"></datalist>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <input id="imp-branch" class="field field-sm" type="text" placeholder="Branch (kosong = default)" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0">
+        <input id="imp-folder" class="field field-sm" type="text" placeholder="Folder dalam repo (pilihan)" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0">
+      </div>
+      <select id="imp-mode" class="field field-sm" style="margin-bottom:8px">
+        <option value="gabung">Gabung — kekalkan fail sedia ada, tindih yang sama nama</option>
+        <option value="ganti">Ganti Semua — buang semua isi repo dulu</option>
+      </select>
+      <input id="imp-msg" class="field field-sm" type="text" placeholder="Mesej commit (pilihan)" autocomplete="off" style="margin-bottom:10px">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
+        <button class="btn" id="imp-btn-semak" onclick="impSemak()" style="border-color:var(--accent);color:var(--accent)">🔍 Semak Fail</button>
+        <button class="btn success" id="imp-btn-deploy" onclick="impDeploy()" style="display:none">🚀 Deploy ke Repo</button>
+        <button class="btn danger" id="imp-btn-batal" onclick="impBatal()" style="display:none;flex:none">✕ Batal</button>
+      </div>
+      <div id="imp-prog-wrap" style="display:none;margin-bottom:8px">
+        <div style="height:8px;background:var(--surface2);border:1px solid var(--border);border-radius:6px;overflow:hidden">
+          <div id="imp-prog-bar" style="height:100%;width:0;background:var(--green);transition:width .2s"></div>
+        </div>
+        <div id="imp-prog-txt" style="font-size:11px;color:var(--text2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
+      </div>
+      <div id="imp-log" style="max-height:22vh;overflow-y:auto;margin-bottom:8px"></div>
+      <pre id="imp-list" style="display:none;margin:0;padding:8px;max-height:28vh;overflow:auto;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:10px;line-height:1.5;color:var(--text2);white-space:pre"></pre>
+    </div>
   </div>
 </div>
 
@@ -3548,6 +3604,318 @@ function strukturDownloadTxt(){
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   setTimeout(function(){URL.revokeObjectURL(url);},1000);
   showNotif('⬇ '+nama,'ok');
+}
+
+// ═══════════════════════════════════
+// IMPORT REPO / ZIP → REPO SAYA
+// ═══════════════════════════════════
+var _imp={tab:'repo',files:null,zip:null,busy:false,batal:false};
+function impBuka(srcLink){
+  document.getElementById('import-modal').style.display='flex';
+  impIsiDatalist();
+  if(srcLink){document.getElementById('imp-src').value=srcLink;impTab('repo');}
+  else impTab(_imp.tab);
+}
+function impBukaDariStruktur(){
+  if(!_stk.repo){impBuka();return;}
+  impBuka('https://github.com/'+_stk.repo+(_stk.branch?'/tree/'+_stk.branch+(_stk.sub?'/'+_stk.sub:''):''));
+}
+function impTutup(){
+  if(_imp.busy){
+    if(!confirm('Import sedang berjalan. Batalkan dan tutup?')) return;
+    _imp.batal=true;
+  }
+  document.getElementById('import-modal').style.display='none';
+}
+function impTab(t){
+  if(_imp.busy) return;
+  _imp.tab=t; _imp.files=null;
+  document.getElementById('imp-tab-repo').classList.toggle('active',t==='repo');
+  document.getElementById('imp-tab-zip').classList.toggle('active',t==='zip');
+  document.getElementById('imp-view-repo').style.display=t==='repo'?'block':'none';
+  document.getElementById('imp-view-zip').style.display=t==='zip'?'block':'none';
+  impResetHasil();
+}
+function impResetHasil(){
+  _imp.files=null;
+  document.getElementById('imp-btn-deploy').style.display='none';
+  document.getElementById('imp-list').style.display='none';
+  document.getElementById('imp-prog-wrap').style.display='none';
+  document.getElementById('imp-log').innerHTML='';
+}
+function impIsiDatalist(){
+  var dl=document.getElementById('imp-tgt-list'); if(!dl) return;
+  var seen={},html='';
+  (ghGetConfigs()||[]).forEach(function(c){
+    if(c&&c.repo&&!seen[c.repo]){seen[c.repo]=1;html+='<option value="'+c.repo+'">';}
+  });
+  dl.innerHTML=html;
+}
+function impPilihZip(el){
+  var f=el.files&&el.files[0]; if(!f) return;
+  _imp.zip=f;
+  document.getElementById('imp-zip-name').textContent='📦 '+f.name+' ('+impSaiz(f.size)+')';
+  impResetHasil();
+  el.value='';
+}
+function impSaiz(b){
+  b=b||0;
+  return b>=1048576?(b/1048576).toFixed(1)+'MB':b>=1024?Math.round(b/1024)+'KB':b+'B';
+}
+function impLog(msg,type){
+  var el=document.getElementById('imp-log');
+  var c=type==='ok'?'var(--green)':type==='err'?'var(--red)':type==='warn'?'var(--amber)':'var(--text2)';
+  var d=document.createElement('div');
+  d.style.cssText='color:'+c+';font-size:11px;line-height:1.5;word-break:break-all';
+  d.textContent=msg;
+  el.appendChild(d);
+  el.scrollTop=el.scrollHeight;
+}
+function impProg(done,total,label){
+  document.getElementById('imp-prog-wrap').style.display='block';
+  var pct=total?Math.round(done/total*100):0;
+  document.getElementById('imp-prog-bar').style.width=pct+'%';
+  document.getElementById('imp-prog-txt').textContent=done+'/'+total+' fail ('+pct+'%)'+(label?' · '+label:'');
+}
+function impApi(method,url,body){
+  var h={'Accept':'application/vnd.github.v3+json'};
+  var t=ghGetToken(); if(t) h['Authorization']='token '+t;
+  var opt={method:method,headers:h};
+  if(body!==undefined){h['Content-Type']='application/json';opt.body=JSON.stringify(body);}
+  return fetch('https://api.github.com'+url,opt).then(function(r){
+    return r.text().then(function(txt){
+      var d=null; try{d=txt?JSON.parse(txt):null;}catch(e){}
+      if(!r.ok){
+        var err=new Error((d&&d.message)||('HTTP '+r.status));
+        err.status=r.status;
+        if(r.status===403&&r.headers.get('x-ratelimit-remaining')==='0') err.rateLimit=true;
+        throw err;
+      }
+      return d;
+    });
+  });
+}
+function impCuba(fn,kali){
+  return fn().catch(function(e){
+    if(kali<=0||_imp.batal||e.status===422||e.status===404||e.rateLimit) throw e;
+    return new Promise(function(res){setTimeout(res,1500);}).then(function(){return impCuba(fn,kali-1);});
+  });
+}
+function impParseRepo(v){
+  v=(v||'').trim();
+  if(!v) return null;
+  v=v.replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/[?#].*$/,'').replace(/\.git$/,'').replace(/\/+$/,'');
+  var p=v.split('/');
+  if(p.length<2||!p[0]||!p[1]) return null;
+  var o={repo:p[0]+'/'+p[1],owner:p[0],name:p[1],branch:'',sub:''};
+  if(p[2]==='tree'||p[2]==='blob'){
+    o.branch=p[3]||'';
+    o.sub=p.slice(4).join('/');
+    if(p[2]==='blob') o.sub=o.sub.split('/').slice(0,-1).join('/');
+  }
+  return o;
+}
+function impMuatJSZip(){
+  if(window.JSZip) return Promise.resolve();
+  return new Promise(function(res,rej){
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+    s.onload=function(){res();};
+    s.onerror=function(){rej(new Error('Gagal muat JSZip — perlu internet'));};
+    document.head.appendChild(s);
+  });
+}
+var IMP_MAX_FAIL=50*1048576;
+function impSemak(){
+  if(_imp.busy) return;
+  if(!ghGetToken()){showNotif('Simpan API Key dahulu dalam 🚀 Deploy → 🔑','err');return;}
+  impResetHasil();
+  var btn=document.getElementById('imp-btn-semak');
+  btn.disabled=true; btn.textContent='⏳ Menyemak...';
+  var p=_imp.tab==='repo'?impSemakRepo():impSemakZip();
+  p.then(function(files){
+    var besar=files.filter(function(f){return f.size>IMP_MAX_FAIL;});
+    if(besar.length){
+      impLog('⚠ '+besar.length+' fail melebihi 50MB dilangkau: '+besar.map(function(f){return f.path;}).slice(0,5).join(', '),'warn');
+      files=files.filter(function(f){return f.size<=IMP_MAX_FAIL;});
+    }
+    if(!files.length){impLog('✕ Tiada fail untuk diimport','err');return;}
+    _imp.files=files;
+    var jumlah=files.reduce(function(s,f){return s+(f.size||0);},0);
+    impLog('✓ Cukup! '+files.length+' fail · '+impSaiz(jumlah)+' sedia untuk deploy','ok');
+    if(files.length>800) impLog('⚠ Fail sangat banyak — mungkin ambil masa lama & guna banyak kuota API','warn');
+    if(jumlah>60*1048576) impLog('⚠ Saiz besar — phone mungkin perlahan','warn');
+    var lst=document.getElementById('imp-list');
+    var paths=files.map(function(f){return f.path;});
+    lst.textContent=paths.slice(0,300).join('\n')+(paths.length>300?'\n... (+'+(paths.length-300)+' lagi)':'');
+    lst.style.display='block';
+    document.getElementById('imp-btn-deploy').style.display='';
+  }).catch(function(e){
+    impLog('✕ '+e.message,'err');
+  }).then(function(){
+    btn.disabled=false; btn.textContent='🔍 Semak Fail';
+  });
+}
+function impSemakRepo(){
+  var src=impParseRepo(document.getElementById('imp-src').value);
+  if(!src) return Promise.reject(new Error('Format repo sumber: owner/repo atau link GitHub'));
+  impLog('Membaca '+src.repo+'...');
+  var getB=src.branch?Promise.resolve(src.branch):impApi('GET','/repos/'+src.repo).then(function(d){return d.default_branch;});
+  return getB.then(function(b){
+    src.branch=b;
+    return impApi('GET','/repos/'+src.repo+'/git/trees/'+encodeURIComponent(b)+'?recursive=1');
+  }).then(function(d){
+    if(!d||!Array.isArray(d.tree)) throw new Error('Gagal baca struktur repo');
+    if(d.truncated) throw new Error('Repo terlalu besar (senarai terpotong oleh GitHub). Guna Fork/Import di github.com, atau tampal link satu folder sahaja.');
+    var pre=src.sub?src.sub.replace(/^\/+|\/+$/g,'')+'/':'';
+    var files=d.tree.filter(function(x){return x.type==='blob'&&(!pre||x.path.indexOf(pre)===0);})
+      .map(function(x){
+        var mode=['100644','100755','120000'].indexOf(x.mode)>=0?x.mode:'100644';
+        return {path:x.path.slice(pre.length),sha:x.sha,size:x.size||0,mode:mode,src:'gh',repo:src.repo};
+      });
+    if(pre&&!files.length) throw new Error('Folder "'+src.sub+'" tidak dijumpai');
+    impLog('Sumber: '+src.repo+' ('+src.branch+')'+(src.sub?' › '+src.sub:''));
+    return files;
+  });
+}
+function impSemakZip(){
+  if(!_imp.zip) return Promise.reject(new Error('Pilih fail ZIP dahulu'));
+  impLog('Membuka '+_imp.zip.name+'...');
+  return impMuatJSZip().then(function(){
+    return JSZip.loadAsync(_imp.zip);
+  }).then(function(zip){
+    var files=[];
+    zip.forEach(function(p,f){
+      if(f.dir) return;
+      if(/(^|\/)__MACOSX\//.test(p)||/(^|\/)\.DS_Store$/.test(p)||/(^|\/)Thumbs\.db$/i.test(p)) return;
+      var sz=(f._data&&f._data.uncompressedSize)||0;
+      files.push({path:p,zf:f,size:sz,mode:(f.unixPermissions&73)?'100755':'100644',src:'zip'});
+    });
+    if(document.getElementById('imp-strip').checked&&files.length){
+      var first=files[0].path.split('/')[0];
+      var semua=files.every(function(f){return f.path.indexOf('/')>0&&f.path.split('/')[0]===first;});
+      if(semua){
+        files.forEach(function(f){f.path=f.path.slice(first.length+1);});
+        impLog('Folder teratas "'+first+'/" dibuang');
+      }
+    }
+    return files;
+  });
+}
+function impBase64(f){
+  if(f.src==='zip') return f.zf.async('base64');
+  return impApi('GET','/repos/'+f.repo+'/git/blobs/'+f.sha).then(function(d){
+    return (d.content||'').replace(/\n/g,'');
+  });
+}
+function impPastikanRepo(tgt){
+  return impApi('GET','/repos/'+tgt.repo).then(function(d){
+    if(d.permissions&&!d.permissions.push) throw new Error('Token tiada akses tulis ke '+tgt.repo);
+    return d.default_branch||'main';
+  }).catch(function(e){
+    if(e.status!==404) throw e;
+    if(!confirm('Repo "'+tgt.repo+'" tidak wujud.\nCipta repo baru (public)?')) throw new Error('Dibatalkan — repo sasaran tiada');
+    impLog('Mencipta repo '+tgt.repo+'...');
+    return impApi('GET','/user').then(function(u){
+      var url=(u.login||'').toLowerCase()===tgt.owner.toLowerCase()?'/user/repos':'/orgs/'+tgt.owner+'/repos';
+      return impApi('POST',url,{name:tgt.name,auto_init:true,private:false});
+    }).then(function(d){
+      impLog('✓ Repo dicipta','ok');
+      return new Promise(function(res){setTimeout(function(){res(d.default_branch||'main');},2000);});
+    });
+  });
+}
+function impDapatkanHead(repo,branch,dahInit){
+  return impApi('GET','/repos/'+repo+'/git/ref/heads/'+encodeURIComponent(branch)).then(function(r){
+    var sha=r.object.sha;
+    return impApi('GET','/repos/'+repo+'/git/commits/'+sha).then(function(c){return {commit:sha,tree:c.tree.sha};});
+  }).catch(function(e){
+    if(dahInit||(e.status!==404&&e.status!==409)) throw e;
+    impLog('Repo kosong — mencipta commit permulaan...','warn');
+    return impApi('PUT','/repos/'+repo+'/contents/README.md',{
+      message:'Init',content:btoa('# '+repo.split('/')[1]+'\n'),branch:branch
+    }).then(function(){return impDapatkanHead(repo,branch,true);});
+  });
+}
+function impUploadBlobs(repo,prefix){
+  var files=_imp.files,total=files.length,done=0,idx=0,aktif=0,stop=false,out=new Array(total);
+  impProg(0,total,'');
+  return new Promise(function(resolve,reject){
+    var next=function(){
+      if(stop) return;
+      if(_imp.batal){stop=true;reject(new Error('Dibatalkan'));return;}
+      if(idx>=total){ if(aktif===0){stop=true;resolve(out);} return; }
+      var i=idx++,f=files[i];
+      aktif++;
+      impCuba(function(){
+        return impBase64(f).then(function(b64){
+          return impApi('POST','/repos/'+repo+'/git/blobs',{content:b64,encoding:'base64'});
+        });
+      },2).then(function(d){
+        out[i]={path:(prefix?prefix+'/':'')+f.path,mode:f.mode||'100644',type:'blob',sha:d.sha};
+        aktif--; done++;
+        impProg(done,total,f.path.split('/').pop());
+        next();
+      },function(e){
+        stop=true;
+        e.message=f.path+': '+e.message+(e.rateLimit?' (had API GitHub — cuba lagi 1 jam)':'');
+        reject(e);
+      });
+    };
+    for(var k=0;k<4;k++) next();
+  });
+}
+function impKunci(on){
+  _imp.busy=on;
+  ['imp-btn-semak','imp-btn-deploy'].forEach(function(id){var b=document.getElementById(id);if(b)b.disabled=on;});
+  document.getElementById('imp-btn-batal').style.display=on?'':'none';
+}
+function impBatal(){
+  if(!_imp.busy) return;
+  _imp.batal=true;
+  impLog('Membatalkan...','warn');
+}
+function impDeploy(){
+  if(_imp.busy||!_imp.files||!_imp.files.length) return;
+  if(!ghGetToken()){showNotif('Simpan API Key dahulu','err');return;}
+  var tgt=impParseRepo(document.getElementById('imp-tgt').value);
+  if(!tgt){showNotif('Isi repo sasaran: owner/nama-repo','err');return;}
+  var prefix=(document.getElementById('imp-folder').value||'').trim().replace(/^\/+|\/+$/g,'');
+  var ganti=document.getElementById('imp-mode').value==='ganti';
+  var n=_imp.files.length;
+  if(ganti&&!confirm('MOD GANTI SEMUA:\nSemua fail sedia ada dalam '+tgt.repo+' akan DIBUANG dan diganti dengan '+n+' fail ini.\n\nTeruskan?')) return;
+  var msg=(document.getElementById('imp-msg').value||'').trim()||('Import '+n+' fail via KodEdit');
+  var branch=(document.getElementById('imp-branch').value||'').trim()||tgt.branch;
+  var head;
+  _imp.batal=false; impKunci(true);
+  impLog('▶ Deploy '+n+' fail ke '+tgt.repo+(prefix?' › '+prefix:'')+'...');
+  impPastikanRepo(tgt).then(function(defB){
+    branch=branch||defB;
+    return impDapatkanHead(tgt.repo,branch);
+  }).then(function(h){
+    head=h;
+    impLog('Branch: '+branch+' · memuat naik fail...');
+    return impUploadBlobs(tgt.repo,prefix);
+  }).then(function(entries){
+    impLog('Membina struktur folder...');
+    var body={tree:entries};
+    if(!ganti) body.base_tree=head.tree;
+    return impApi('POST','/repos/'+tgt.repo+'/git/trees',body);
+  }).then(function(tr){
+    impLog('Mencipta commit...');
+    return impApi('POST','/repos/'+tgt.repo+'/git/commits',{message:msg,tree:tr.sha,parents:[head.commit]});
+  }).then(function(cm){
+    return impApi('PATCH','/repos/'+tgt.repo+'/git/refs/heads/'+encodeURIComponent(branch),{sha:cm.sha}).then(function(){return cm;});
+  }).then(function(cm){
+    impLog('✓ SIAP! '+n+' fail di-deploy · commit '+cm.sha.slice(0,7),'ok');
+    impLog('https://github.com/'+tgt.repo+'/tree/'+branch+(prefix?'/'+prefix:''),'ok');
+    showNotif('🚀 Import berjaya ke '+tgt.repo,'ok');
+  }).catch(function(e){
+    impLog('✕ '+e.message,'err');
+    showNotif('Import gagal','err');
+  }).then(function(){
+    impKunci(false);
+  });
 }
 function strukturRender(){
   if(_stk.src==='file'){strukturRenderFail();return;}
