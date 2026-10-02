@@ -4068,7 +4068,8 @@ function impDeploy(){
 var _zf={busy:false,batal:false,list:null,repo:'',branch:'',sub:'',jobId:''};
 function zfSaiz(b){ b=b||0; return b>=1048576?(b/1048576).toFixed(1)+'MB':b>=1024?Math.round(b/1024)+'KB':b+'B'; }
 function zfFlatNames(paths){
-  var used={'_peta_fail.txt':1},out=[];
+  var used=Object.create(null),out=[];
+  used['_peta_fail.txt']=1;
   paths.forEach(function(p){
     var nm=p.split('/').pop(),key=nm.toLowerCase();
     if(!used[key]){used[key]=1;out.push(nm);return;}
@@ -4443,11 +4444,11 @@ function strukturRender(){
   } else {
     var maxD=parseInt((document.getElementById('stk-depth')||{}).value||'0',10)||0;
     var maxF=parseInt((document.getElementById('stk-maxf')||{}).value||'0',10)||0;
-    var root={d:{},f:[]};
+    var root={d:Object.create(null),f:[]};
     items.forEach(function(x){
       var parts=x.path.split('/'),n=root;
       var upto=x.type==='blob'?parts.length-1:parts.length;
-      for(var k=0;k<upto;k++){ if(!n.d[parts[k]]) n.d[parts[k]]={d:{},f:[]}; n=n.d[parts[k]]; }
+      for(var k=0;k<upto;k++){ if(!n.d[parts[k]]) n.d[parts[k]]={d:Object.create(null),f:[]}; n=n.d[parts[k]]; }
       if(x.type==='blob') n.f.push(parts[parts.length-1]);
     });
     var rootLabel=_stk.sub?_stk.sub.split('/').pop():(_stk.repo.split('/')[1]||_stk.repo);
@@ -4455,7 +4456,7 @@ function strukturRender(){
     var cmp=function(a,b){a=a.toLowerCase();b=b.toLowerCase();return a<b?-1:a>b?1:0;};
     var walk=function(n,pre,depth){
       var dirs=Object.keys(n.d).sort(cmp).map(function(k){return {k:k,dir:true};});
-      var grp={},keys=[];
+      var grp=Object.create(null),keys=[];
       n.f.forEach(function(fn){
         var di=fn.lastIndexOf('.');
         var base=di>0?fn.slice(0,di):fn,ext=di>0?fn.slice(di):'';
@@ -4488,7 +4489,7 @@ function strukturAnalisis(teks,nama){
   var L=teks.split('\n');
   var ext=(nama||'').toLowerCase().split('.').pop();
   var inStyle=ext==='css',inScript=ext==='js';
-  var bahagian=[],ids={},idOrder=[],kelas={},kelasOrder=[],fn={},fnOrder=[],kol={},kolOrder=[],luar=[];
+  var bahagian=[],ids=Object.create(null),idOrder=[],kelas=Object.create(null),kelasOrder=[],fn=Object.create(null),fnOrder=[],kol=Object.create(null),kolOrder=[],luar=[];
   var add=function(map,order,k,n){ if(map===fn&&k.length<2) return; if(!map[k]){map[k]=[];order.push(k);} map[k].push(n); };
   var m,re;
   for(var i=0;i<L.length;i++){
