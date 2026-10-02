@@ -3963,7 +3963,10 @@ function impDeploy(){
     impLog('https://github.com/'+tgt.repo+'/tree/'+branch+(prefix?'/'+prefix:''),'ok');
     showNotif('🚀 Import berjaya ke '+tgt.repo,'ok');
   }).catch(function(e){
-    impLog('✕ '+e.message,'err');
+    var m=e.message;
+    var adaWf=(_imp.files||[]).some(function(f){return /^\.github\/workflows\//.test((prefix?prefix+'/':'')+f.path);});
+    if(adaWf&&(e.status===404||e.status===422||/workflow/i.test(m))) m+=' — token tiada kebenaran "workflow". Tambah scope workflow pada token (GitHub → Settings → Developer settings), atau upload fail .github/workflows melalui github.com';
+    impLog('✕ '+m,'err');
     showNotif('Import gagal','err');
   }).then(function(){
     impKunci(false);
