@@ -359,10 +359,26 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <button class="tool-btn" onclick="strukturKeRepo()" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">🌳 Repo</button>
       <input type="file" id="stk-file-input" accept=".html,.htm,.js,.css,.txt,.json,.md" style="display:none" onchange="strukturBacaFail(this)">
     </div>
+    <div style="padding:8px 10px 0;display:flex;gap:6px;flex-shrink:0;align-items:center">
+      <input id="stk-repo-input" type="text" placeholder="owner/repo atau link GitHub" onkeydown="if(event.key==='Enter')strukturDariInput()" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 10px;font-size:12px;outline:none">
+      <button class="tool-btn" onclick="strukturDariInput()" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">🌳 Lihat</button>
+    </div>
+    <div style="padding:6px 10px 0;display:flex;gap:8px;flex-shrink:0;align-items:center;font-size:11px;color:var(--text2)">
+      <span>Dalam</span>
+      <select id="stk-depth" onchange="strukturRender()" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 6px;font-size:11px">
+        <option value="0">Semua</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option>
+      </select>
+      <span>Fail/folder</span>
+      <select id="stk-maxf" onchange="strukturRender()" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);padding:4px 6px;font-size:11px">
+        <option value="0">Semua</option><option value="10">10</option><option value="20">20</option><option value="50">50</option>
+      </select>
+    </div>
     <div style="padding:8px 10px;display:flex;gap:6px;align-items:center;flex-shrink:0;flex-wrap:wrap">
       <input id="stk-filter" type="text" placeholder="Tapis (cth: .js, css/)" oninput="strukturRender()" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:120px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);padding:7px 10px;font-size:12px;outline:none">
       <button class="tool-btn" id="stk-mode-btn" onclick="strukturTukarMod()" style="padding:4px 10px;font-size:11px">📄 Laluan</button>
       <button class="tool-btn" onclick="strukturCopy()" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">📋 Copy</button>
+      <button class="tool-btn" onclick="strukturCopyBlok()" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)">``` Copy</button>
+      <button class="tool-btn" onclick="strukturDownloadTxt()" style="padding:4px 10px;font-size:11px;border-color:var(--amber);color:var(--amber)">⬇ TXT</button>
     </div>
     <div id="stk-info" style="padding:0 12px 6px;font-size:11px;color:var(--text2);flex-shrink:0"></div>
     <pre id="stk-out" style="flex:1;margin:0 10px 10px;padding:10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;overflow:auto;font-family:monospace;font-size:11px;line-height:1.5;color:var(--text);white-space:pre;-webkit-user-select:text;user-select:text"></pre>
@@ -3427,28 +3443,65 @@ function multiDownloadAll(){
 // STRUKTUR REPO
 // ═══════════════════════════════════
 var _stk={repo:'',branch:'main',items:null,truncated:false,mode:'tree',src:'repo',outline:null,fileName:''};
-function strukturBuka(repo,branch){
+function strukturBuka(repo,branch,subpath){
   _stk.src='repo';
-  _stk.repo=repo; _stk.branch=branch||'main'; _stk.items=null; _stk.truncated=false;
+  _stk.repo=repo; _stk.branch=branch||''; _stk.items=null; _stk.truncated=false;
+  _stk.sub=(subpath||'').replace(/^\/+|\/+$/g,'');
   document.getElementById('stk-mode-btn').style.display='';
-  document.getElementById('stk-title').textContent='🌳 '+repo+' ('+_stk.branch+')';
+  document.getElementById('stk-title').textContent='🌳 '+repo+(_stk.sub?'/'+_stk.sub:'');
   document.getElementById('stk-filter').value='';
   document.getElementById('stk-info').textContent='';
+  var ri=document.getElementById('stk-repo-input');
+  if(ri) ri.value=repo+(_stk.sub?(' › '+_stk.sub):'');
   var out=document.getElementById('stk-out');
   out.textContent='⏳ Memuatkan struktur...';
   document.getElementById('stk-mode-btn').textContent=_stk.mode==='path'?'🌳 Pokok':'📄 Laluan';
   document.getElementById('struktur-modal').style.display='flex';
   var h={'Accept':'application/vnd.github.v3+json'};
   var t=ghGetToken(); if(t) h['Authorization']='token '+t;
-  fetch('https://api.github.com/repos/'+repo+'/git/trees/'+encodeURIComponent(_stk.branch)+'?recursive=1',{headers:h})
+  var getBranch=_stk.branch?Promise.resolve(_stk.branch):
+    fetch('https://api.github.com/repos/'+repo,{headers:h})
+      .then(function(r){return r.json();})
+      .then(function(d){
+        if(!d||!d.default_branch) throw new Error((d&&d.message)||'Repo tidak dijumpai / private');
+        return d.default_branch;
+      });
+  getBranch
+    .then(function(b){
+      _stk.branch=b;
+      document.getElementById('stk-title').textContent='🌳 '+repo+(_stk.sub?'/'+_stk.sub:'')+' ('+b+')';
+      return fetch('https://api.github.com/repos/'+repo+'/git/trees/'+encodeURIComponent(b)+'?recursive=1',{headers:h});
+    })
     .then(function(r){return r.json();})
     .then(function(d){
       if(!d||!Array.isArray(d.tree)){out.textContent='✕ '+((d&&d.message)||'Gagal muat struktur');return;}
-      _stk.items=d.tree.filter(function(x){return x.type==='blob'||x.type==='tree';});
+      var items=d.tree.filter(function(x){return x.type==='blob'||x.type==='tree';});
+      if(_stk.sub){
+        var pre=_stk.sub+'/';
+        items=items.filter(function(x){return x.path.indexOf(pre)===0;})
+          .map(function(x){return {path:x.path.slice(pre.length),type:x.type};});
+        if(!items.length){out.textContent='✕ Folder "'+_stk.sub+'" tidak dijumpai';return;}
+      }
+      _stk.items=items;
       _stk.truncated=!!d.truncated;
       strukturRender();
     })
     .catch(function(e){out.textContent='✕ '+e.message;});
+}
+function strukturDariInput(){
+  var v=(document.getElementById('stk-repo-input').value||'').trim();
+  if(!v){showNotif('Masukkan owner/repo atau link GitHub','err');return;}
+  v=v.split(' › ')[0]===v?v:v.replace(' › ','/tree//');
+  v=v.replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/[?#].*$/,'').replace(/\.git$/,'').replace(/\/+$/,'');
+  var p=v.split('/');
+  if(p.length<2||!p[0]||!p[1]){showNotif('Format: owner/repo','err');return;}
+  var repo=p[0]+'/'+p[1],branch='',sub='';
+  if(p[2]==='tree'||p[2]==='blob'){
+    branch=p[3]||'';
+    sub=p.slice(4).join('/');
+    if(p[2]==='blob') sub=sub.split('/').slice(0,-1).join('/');
+  }
+  strukturBuka(repo,branch,sub);
 }
 function strukturTutup(){
   document.getElementById('struktur-modal').style.display='none';
@@ -3456,6 +3509,45 @@ function strukturTutup(){
 function strukturTukarMod(){
   _stk.mode=_stk.mode==='path'?'tree':'path';
   strukturRender();
+}
+function _stkSedia(){
+  if(_stk.src==='file'?!_stk.outline:!_stk.items){showNotif('Struktur belum dimuat','err');return null;}
+  var txt=document.getElementById('stk-out').textContent||'';
+  if(!txt||txt==='(Tiada padanan)'){showNotif('Tiada output untuk disalin','err');return null;}
+  return txt;
+}
+function _stkClip(txt,msg){
+  var done=function(){showNotif(msg,'ok');};
+  var fallback=function(){
+    var ta=document.createElement('textarea');
+    ta.value=txt; ta.setAttribute('readonly','readonly');
+    ta.style.cssText='position:fixed;top:-9999px;left:0;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    try{document.execCommand('copy');done();}catch(e){showNotif('Gagal salin','err');}
+    document.body.removeChild(ta);
+  };
+  if(navigator.clipboard&&window.isSecureContext){navigator.clipboard.writeText(txt).then(done).catch(fallback);}
+  else fallback();
+}
+function strukturCopyBlok(){
+  var txt=_stkSedia(); if(txt==null) return;
+  _stkClip('```text\n'+txt+'\n```','📋 Disalin dalam blok kod ```');
+}
+function strukturDownloadTxt(){
+  var txt=_stkSedia(); if(txt==null) return;
+  var nama;
+  if(_stk.src==='file'){
+    nama=(_stk.fileName||'fail').replace(/\.[^.]+$/,'')+'-struktur';
+  } else {
+    nama=(_stk.repo.split('/')[1]||'repo')+(_stk.sub?'-'+_stk.sub.replace(/\//g,'-'):'')+(_stk.mode==='path'?'-laluan':'-pokok');
+  }
+  nama=nama.replace(/[^\w.\-]+/g,'_')+'.txt';
+  var blob=new Blob([txt],{type:'text/plain;charset=utf-8'});
+  var url=URL.createObjectURL(blob);
+  var a=document.createElement('a'); a.href=url; a.download=nama;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(function(){URL.revokeObjectURL(url);},1000);
+  showNotif('⬇ '+nama,'ok');
 }
 function strukturRender(){
   if(_stk.src==='file'){strukturRenderFail();return;}
@@ -3470,6 +3562,8 @@ function strukturRender(){
   if(_stk.mode==='path'){
     txt=items.filter(function(x){return x.type==='blob';}).map(function(x){return x.path;}).sort().join('\n');
   } else {
+    var maxD=parseInt((document.getElementById('stk-depth')||{}).value||'0',10)||0;
+    var maxF=parseInt((document.getElementById('stk-maxf')||{}).value||'0',10)||0;
     var root={d:{},f:[]};
     items.forEach(function(x){
       var parts=x.path.split('/'),n=root;
@@ -3477,17 +3571,35 @@ function strukturRender(){
       for(var k=0;k<upto;k++){ if(!n.d[parts[k]]) n.d[parts[k]]={d:{},f:[]}; n=n.d[parts[k]]; }
       if(x.type==='blob') n.f.push(parts[parts.length-1]);
     });
-    var lines=[(_stk.repo.split('/')[1]||_stk.repo)+'/'];
-    var walk=function(n,pre){
-      var all=Object.keys(n.d).sort().map(function(k){return {k:k,dir:true};})
-        .concat(n.f.slice().sort().map(function(k){return {k:k,dir:false};}));
+    var rootLabel=_stk.sub?_stk.sub.split('/').pop():(_stk.repo.split('/')[1]||_stk.repo);
+    var lines=[rootLabel+'/'];
+    var cmp=function(a,b){a=a.toLowerCase();b=b.toLowerCase();return a<b?-1:a>b?1:0;};
+    var walk=function(n,pre,depth){
+      var dirs=Object.keys(n.d).sort(cmp).map(function(k){return {k:k,dir:true};});
+      var grp={},keys=[];
+      n.f.forEach(function(fn){
+        var di=fn.lastIndexOf('.');
+        var base=di>0?fn.slice(0,di):fn,ext=di>0?fn.slice(di):'';
+        var key=di>0?base:fn+'\u0000';
+        if(!grp[key]){grp[key]={base:base,exts:[]};keys.push(key);}
+        grp[key].exts.push(ext);
+      });
+      var files=keys.sort(cmp).map(function(k){
+        var g=grp[k]; g.exts.sort(cmp);
+        return {k:g.base+g.exts[0]+g.exts.slice(1).map(function(e){return ' / '+e;}).join(''),dir:false};
+      });
+      if(maxF&&files.length>maxF){
+        var lebih=files.length-maxF;
+        files=files.slice(0,maxF).concat([{k:'... (+'+lebih+' lagi)',dir:false}]);
+      }
+      var all=dirs.concat(files);
       all.forEach(function(e,idx){
         var last=idx===all.length-1;
         lines.push(pre+(last?'└── ':'├── ')+e.k+(e.dir?'/':''));
-        if(e.dir) walk(n.d[e.k],pre+(last?'    ':'│   '));
+        if(e.dir&&(!maxD||depth+1<maxD)) walk(n.d[e.k],pre+(last?'    ':'│   '),depth+1);
       });
     };
-    walk(root,'');
+    walk(root,'',0);
     txt=lines.length>1?lines.join('\n'):'';
   }
   out.textContent=txt||'(Tiada padanan)';
