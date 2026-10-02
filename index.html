@@ -481,9 +481,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
         <div class="field-label">☁ Proses di GitHub Actions — disyorkan untuk repo besar (tak perlu phone sentiasa hidup)</div>
         <div style="display:flex;gap:8px;align-items:center">
-          <input id="zf-worker" class="field field-sm" type="text" placeholder="owner/kodedit-worker" onchange="zfCloudSimpanWorker();zfCloudSenarai()" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0">
+          <input id="zf-worker" class="field field-sm" type="text" placeholder="owner/kodedit-worker (public)" onchange="zfCloudSimpanWorker();zfCloudSenarai()" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0">
           <button class="btn primary" id="zf-btn-cloud" onclick="zfCloudMula()" style="flex:none;padding:10px 12px">☁ Proses di GitHub</button>
         </div>
+        <div class="field-label" style="margin-top:8px">🔒 Repo pekerja PRIVATE — digunakan automatik bila repo sumber private</div>
+        <input id="zf-worker-priv" class="field field-sm" type="text" placeholder="owner/kodedit-worker-private" onchange="zfCloudSimpanWorker();zfCloudSenarai()" autocomplete="off" autocapitalize="off" spellcheck="false">
         <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px">
           <span style="font-size:11px;color:var(--text2)">Job terkini</span>
           <button class="tool-btn" onclick="zfCloudSenarai()" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)">🔍 Semak status</button>
@@ -4298,31 +4300,34 @@ async function zfPadamCache(){
 // ZIP FLAT — GITHUB ACTIONS (☁)
 // ═══════════════════════════════════
 var _zfc={timer:null,wf:'zipflat.yml'};
-function zfCloudWorker(){
-  var el=document.getElementById('zf-worker');
+function _zfcVal(id){
+  var el=document.getElementById(id);
   return ((el&&el.value)||'').trim().replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/\/+$/,'');
 }
+function zfCloudWorker(){ return _zfcVal('zf-worker'); }
+function zfCloudWorkerPriv(){ return _zfcVal('zf-worker-priv'); }
+function _zfcSah(w){ return /^[\w.-]+\/[\w.-]+$/.test(w||''); }
+function _zfcQ(s){ return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 function zfCloudInit(){
-  var el=document.getElementById('zf-worker');
-  if(el&&!el.value){
-    var v='';
-    try{v=localStorage.getItem('kodedit_worker')||'';}catch(e){}
-    if(!v){
-      var c=(ghGetConfigs()||[])[0];
-      if(c&&c.repo) v=c.repo.split('/')[0]+'/kodedit-worker';
-    }
+  var owner='',c=(ghGetConfigs()||[])[0];
+  if(c&&c.repo) owner=c.repo.split('/')[0];
+  [['zf-worker','kodedit_worker','/kodedit-worker'],['zf-worker-priv','kodedit_worker_priv','/kodedit-worker-private']].forEach(function(x){
+    var el=document.getElementById(x[0]); if(!el||el.value) return;
+    var v=''; try{v=localStorage.getItem(x[1])||'';}catch(e){}
+    if(!v&&owner) v=owner+x[2];
     el.value=v;
-  }
-  if(zfCloudWorker()) zfCloudSenarai();
+  });
+  if(zfCloudWorker()||zfCloudWorkerPriv()) zfCloudSenarai();
 }
 function zfCloudSimpanWorker(){
-  try{localStorage.setItem('kodedit_worker',zfCloudWorker());}catch(e){}
+  try{
+    localStorage.setItem('kodedit_worker',zfCloudWorker());
+    localStorage.setItem('kodedit_worker_priv',zfCloudWorkerPriv());
+  }catch(e){}
 }
 async function zfCloudMula(){
   if(!_zf.list){showNotif('Buka struktur repo dahulu','err');return;}
   if(!ghGetToken()){showNotif('Simpan API Key dahulu dalam 🚀 Deploy → 🔑','err');return;}
-  var w=zfCloudWorker();
-  if(!/^[\w.-]+\/[\w.-]+$/.test(w)){showNotif('Isi repo pekerja: owner/kodedit-worker','err');return;}
   zfCloudSimpanWorker();
   var pv=document.getElementById('zf-part').value||'0';
   var per=pv.charAt(0)==='f'?(parseInt(pv.slice(1),10)||10):0;
@@ -4333,13 +4338,23 @@ async function zfCloudMula(){
   btn.disabled=true; btn.textContent='⏳ Menghantar...';
   try{
     var sumber=await impApi('GET','/repos/'+_zf.repo).catch(function(){return null;});
-    if(sumber&&sumber.private){
-      zfLog('✕ '+_zf.repo+' ialah repo PRIVATE. ☁ GitHub tidak boleh clone repo private, dan hasil ZIP akan terdedah dalam Release public. Guna ▶ Mula (proses di phone) untuk repo ini.','err');
-      showNotif('Repo private — guna ▶ Mula','err');
+    var priv=!!(sumber&&sumber.private);
+    var w=priv?zfCloudWorkerPriv():zfCloudWorker();
+    if(!_zfcSah(w)){
+      zfLog('✕ Isi '+(priv?'repo pekerja PRIVATE (repo sumber ini private)':'repo pekerja public')+': owner/nama-repo','err');
       return;
     }
-    var info=await impApi('GET','/repos/'+w);
-    if(info.private) zfLog('⚠ Repo pekerja private — pautan muat turun mungkin tak boleh dibuka dari phone. Disyorkan public.','warn');
+    var info;
+    try{ info=await impApi('GET','/repos/'+w); }
+    catch(e){
+      if(e.status===404){ zfLog('✕ Repo pekerja '+w+' tidak dijumpai.'+(priv?' Cipta repo PRIVATE '+w+' dan masukkan fail kodedit-worker.zip ke dalamnya.':''),'err'); return; }
+      throw e;
+    }
+    if(priv&&!info.private){
+      zfLog('✕ '+_zf.repo+' ialah repo PRIVATE tetapi repo pekerja '+w+' adalah PUBLIC — kod akan terdedah. Tukar '+w+' kepada private atau guna repo pekerja lain.','err');
+      return;
+    }
+    if(priv) zfLog('🔒 Repo sumber private → guna repo pekerja private '+w);
     await impApi('POST','/repos/'+w+'/actions/workflows/'+_zfc.wf+'/dispatches',{
       ref:info.default_branch||'main',
       inputs:{
@@ -4352,7 +4367,7 @@ async function zfCloudMula(){
     setTimeout(zfCloudSenarai,4000);
   }catch(e){
     var m=e.message;
-    if(e.status===404) m='Repo pekerja / workflow '+_zfc.wf+' tidak dijumpai dalam '+w;
+    if(e.status===404) m='Workflow '+_zfc.wf+' tidak dijumpai dalam repo pekerja — masukkan fail kodedit-worker.zip';
     if(e.status===403) m+=' — token perlu kebenaran Actions (classic: repo + workflow)';
     zfLog('✕ '+m,'err');
   }finally{
@@ -4361,76 +4376,127 @@ async function zfCloudMula(){
 }
 async function zfCloudSenarai(){
   clearTimeout(_zfc.timer);
-  var w=zfCloudWorker(), box=document.getElementById('zf-jobs');
-  if(!box||!w) return;
+  var box=document.getElementById('zf-jobs');
+  if(!box) return;
   if(!ghGetToken()){box.innerHTML='<div style="font-size:11px;color:var(--text2)">Simpan API Key untuk lihat job</div>';return;}
-  try{
-    var runs=await impApi('GET','/repos/'+w+'/actions/workflows/'+_zfc.wf+'/runs?per_page=10');
-    var rels=await impApi('GET','/repos/'+w+'/releases?per_page=30');
-    var relMap={};
-    (rels||[]).forEach(function(r){relMap[r.tag_name]=r;});
-    var list=(runs&&runs.workflow_runs)||[];
-    if(!list.length){box.innerHTML='<div style="font-size:11px;color:var(--text2)">Tiada job lagi</div>';return;}
-    var aktif=false,html='';
-    list.forEach(function(r){
-      var tajuk=r.display_title||r.name||'';
-      var job=tajuk.indexOf('zipflat ')===0?tajuk.slice(8):'';
-      var rel=job?relMap[job]:null;
-      var st,warna;
-      if(r.status!=='completed'){st=r.status==='queued'?'⏳ Menunggu giliran':'⚙ Sedang diproses';warna='var(--amber)';aktif=true;}
-      else if(r.conclusion==='success'){st='✓ Siap';warna='var(--green)';}
-      else if(r.conclusion==='cancelled'){st='⊘ Dibatalkan';warna='var(--text2)';}
-      else {st='✕ Gagal';warna='var(--red)';}
-      var masa=new Date(r.created_at).toLocaleString('ms-MY',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
-      var sumber=rel?rel.name.replace(/^ZIP /,''):job;
-      html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px">'+
-        '<div style="display:flex;gap:6px;align-items:center">'+
-          '<span style="font-size:12px;color:'+warna+';font-weight:600">'+st+'</span>'+
-          '<span style="font-size:11px;color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+sumber+'</span>'+
-          '<span style="font-size:10px;color:var(--text2)">'+masa+'</span>'+
-        '</div>';
-      if(rel&&rel.assets&&rel.assets.length){
+  var workers=[];
+  [zfCloudWorker(),zfCloudWorkerPriv()].forEach(function(w){ if(_zfcSah(w)&&workers.indexOf(w)<0) workers.push(w); });
+  if(!workers.length){box.innerHTML='';return;}
+  var semua=[],nota=[],relMap={};
+  for(var wi=0;wi<workers.length;wi++){
+    var w=workers[wi];
+    try{
+      var info=await impApi('GET','/repos/'+w);
+      var runs=await impApi('GET','/repos/'+w+'/actions/workflows/'+_zfc.wf+'/runs?per_page=10');
+      if(!info.private){
+        var rels=await impApi('GET','/repos/'+w+'/releases?per_page=30');
+        (rels||[]).forEach(function(r){relMap[w+'|'+r.tag_name]=r;});
+      }
+      ((runs&&runs.workflow_runs)||[]).forEach(function(r){semua.push({r:r,w:w,priv:!!info.private});});
+    }catch(e){
+      nota.push(e.status===404?w+' belum disediakan':w+': '+e.message);
+    }
+  }
+  semua.sort(function(a,b){return new Date(b.r.created_at)-new Date(a.r.created_at);});
+  semua=semua.slice(0,10);
+  var aktif=false,html='';
+  for(var i=0;i<semua.length;i++){
+    var it=semua[i],r=it.r,w2=it.w;
+    var tajuk=r.display_title||r.name||'';
+    var job=tajuk.indexOf('zipflat ')===0?tajuk.slice(8):'';
+    var st,warna;
+    if(r.status!=='completed'){st=r.status==='queued'?'⏳ Menunggu giliran':'⚙ Sedang diproses';warna='var(--amber)';aktif=true;}
+    else if(r.conclusion==='success'){st='✓ Siap';warna='var(--green)';}
+    else if(r.conclusion==='cancelled'){st='⊘ Dibatalkan';warna='var(--text2)';}
+    else {st='✕ Gagal';warna='var(--red)';}
+    var masa=new Date(r.created_at).toLocaleString('ms-MY',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+    var rel=(!it.priv&&job)?relMap[w2+'|'+job]:null;
+    var fail=null;
+    if(it.priv&&job&&r.status==='completed'&&r.conclusion==='success'){
+      fail=await impApi('GET','/repos/'+w2+'/contents/?ref='+encodeURIComponent('hasil-'+job)).catch(function(){return null;});
+    }
+    var sumber=rel?rel.name.replace(/^ZIP /,''):job;
+    html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px">'+
+      '<div style="display:flex;gap:6px;align-items:center">'+
+        '<span style="font-size:12px;color:'+warna+';font-weight:600">'+st+'</span>'+
+        (it.priv?'<span style="font-size:11px" title="Repo pekerja private">🔒</span>':'')+
+        '<span style="font-size:11px;color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+sumber+'</span>'+
+        '<span style="font-size:10px;color:var(--text2)">'+masa+'</span>'+
+      '</div>';
+    if(rel&&rel.assets&&rel.assets.length){
+      html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
+      rel.assets.forEach(function(a){
+        html+='<button class="tool-btn" onclick="zfCloudMuatTurun(\''+_zfcQ(a.browser_download_url)+'\')" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">⬇ '+a.name+' · '+zfSaiz(a.size)+'</button>';
+      });
+      html+='<button class="tool-btn" onclick="zfCloudPadam(\''+_zfcQ(w2)+'\','+rel.id+',\''+_zfcQ(rel.tag_name)+'\')" style="padding:4px 8px;font-size:11px;border-color:var(--red);color:var(--red)">🗑</button>';
+      html+='</div>';
+    }
+    if(Array.isArray(fail)){
+      var zips=fail.filter(function(f){return f.type==='file'&&/\.zip$/i.test(f.name);});
+      if(zips.length){
         html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
-        rel.assets.forEach(function(a){
-          html+='<button class="tool-btn" onclick="zfCloudMuatTurun(\''+a.browser_download_url.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">⬇ '+a.name+' · '+zfSaiz(a.size)+'</button>';
+        zips.forEach(function(f){
+          html+='<button class="tool-btn" onclick="zfCloudMuatTurunPriv(\''+_zfcQ(w2)+'\',\''+_zfcQ(job)+'\',\''+_zfcQ(f.name)+'\',\''+f.sha+'\')" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">⬇ '+f.name+' · '+zfSaiz(f.size)+'</button>';
         });
-        html+='<button class="tool-btn" onclick="zfCloudPadam('+rel.id+',\''+rel.tag_name+'\')" style="padding:4px 8px;font-size:11px;border-color:var(--red);color:var(--red)">🗑</button>';
+        html+='<button class="tool-btn" onclick="zfCloudPadamCawangan(\''+_zfcQ(w2)+'\',\''+_zfcQ(job)+'\')" style="padding:4px 8px;font-size:11px;border-color:var(--red);color:var(--red)">🗑</button>';
         html+='</div>';
       }
-      if(r.status==='completed'&&r.conclusion!=='success'){
-        html+='<div style="display:flex;gap:6px;margin-top:6px">'+
-          '<button class="tool-btn" onclick="zfCloudUlang('+r.id+')" style="padding:4px 10px;font-size:11px;border-color:var(--amber);color:var(--amber)">↻ Ulang</button>'+
-          '<button class="tool-btn" onclick="window.open(\''+r.html_url+'\',\'_blank\')" style="padding:4px 10px;font-size:11px">📄 Log</button>'+
-        '</div>';
-      }
-      html+='</div>';
-    });
-    box.innerHTML=html;
-    var modal=document.getElementById('zipflat-modal');
-    if(aktif&&modal&&modal.style.display==='flex') _zfc.timer=setTimeout(zfCloudSenarai,10000);
-  }catch(e){
-    var m=e.status===404?'Repo pekerja / workflow tidak dijumpai: '+w:e.message;
-    box.innerHTML='<div style="font-size:11px;color:var(--red)">✕ '+m+'</div>';
+    }
+    if(r.status==='completed'&&r.conclusion!=='success'){
+      html+='<div style="display:flex;gap:6px;margin-top:6px">'+
+        '<button class="tool-btn" onclick="zfCloudUlang(\''+_zfcQ(w2)+'\','+r.id+')" style="padding:4px 10px;font-size:11px;border-color:var(--amber);color:var(--amber)">↻ Ulang</button>'+
+        '<button class="tool-btn" onclick="window.open(\''+_zfcQ(r.html_url)+'\',\'_blank\')" style="padding:4px 10px;font-size:11px">📄 Log</button>'+
+      '</div>';
+    }
+    html+='</div>';
   }
+  if(!semua.length) html='<div style="font-size:11px;color:var(--text2)">Tiada job lagi</div>';
+  if(nota.length) html+='<div style="font-size:10px;color:var(--text2);margin-top:4px">ℹ '+nota.join(' · ')+'</div>';
+  box.innerHTML=html;
+  var modal=document.getElementById('zipflat-modal');
+  if(aktif&&modal&&modal.style.display==='flex') _zfc.timer=setTimeout(zfCloudSenarai,10000);
 }
 function zfCloudMuatTurun(url){
   var a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener';
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
 }
-async function zfCloudUlang(runId){
-  var w=zfCloudWorker();
+async function zfCloudMuatTurunPriv(w,job,nama,sha){
+  showNotif('⏳ Memuat turun '+nama+'...','info');
+  var h={'Authorization':'token '+ghGetToken()};
+  try{
+    var blob=null;
+    var r=await fetch('https://api.github.com/repos/'+w+'/contents/'+encodeURIComponent(nama)+'?ref='+encodeURIComponent('hasil-'+job),
+      {headers:Object.assign({'Accept':'application/vnd.github.raw'},h)}).catch(function(){return null;});
+    if(r&&r.ok) blob=await r.blob();
+    if(!blob||!blob.size){
+      var d=await impApi('GET','/repos/'+w+'/git/blobs/'+sha);
+      var r2=await fetch('data:application/zip;base64,'+(d.content||'').replace(/\n/g,''));
+      blob=await r2.blob();
+    }
+    zfMuatTurunBlob(blob,nama);
+    showNotif('⬇ '+nama+' · '+zfSaiz(blob.size),'ok');
+  }catch(e){ showNotif('Gagal muat turun: '+e.message,'err'); }
+}
+async function zfCloudUlang(w,runId){
   try{
     await impApi('POST','/repos/'+w+'/actions/runs/'+runId+'/rerun');
     showNotif('↻ Job diulang','ok');
     setTimeout(zfCloudSenarai,3000);
   }catch(e){showNotif('Gagal ulang: '+e.message,'err');}
 }
-async function zfCloudPadam(relId,tag){
+async function zfCloudPadam(w,relId,tag){
   if(!confirm('Padam hasil ZIP ini dari GitHub Release?')) return;
-  var w=zfCloudWorker();
   try{
     await impApi('DELETE','/repos/'+w+'/releases/'+relId);
     await impApi('DELETE','/repos/'+w+'/git/refs/tags/'+encodeURIComponent(tag)).catch(function(){});
+    showNotif('🗑 Dipadam','ok');
+    zfCloudSenarai();
+  }catch(e){showNotif('Gagal padam: '+e.message,'err');}
+}
+async function zfCloudPadamCawangan(w,job){
+  if(!confirm('Padam hasil ZIP ini dari repo pekerja private?')) return;
+  try{
+    await impApi('DELETE','/repos/'+w+'/git/refs/heads/'+encodeURIComponent('hasil-'+job));
     showNotif('🗑 Dipadam','ok');
     zfCloudSenarai();
   }catch(e){showNotif('Gagal padam: '+e.message,'err');}
