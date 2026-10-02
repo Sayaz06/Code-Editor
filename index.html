@@ -574,9 +574,11 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
         <div id="gh-orig-status" style="font-size:11px;margin-top:6px;min-height:14px"></div>
         <div id="gh-orig-lock-note" style="display:none;font-size:11px;margin-top:4px;color:var(--amber);font-style:italic">⚠ Deployment in progress — all deploy buttons are locked to prevent SHA conflicts. Press 🔍 to check build status.</div>
       </div>
+      <div id="gh-sync-status" style="font-size:11px;color:var(--text2);margin-bottom:8px;min-height:14px"></div>
       <div id="gh-apps-list"></div>
-      <div style="text-align:center;margin-top:8px">
-        <button class="btn primary" style="max-width:180px" onclick="ghShowTab('form');ghNewConfig()">➕ Tambah App Baru</button>
+      <div style="display:flex;gap:8px;justify-content:center;margin-top:8px;flex-wrap:wrap">
+        <button class="btn primary" style="max-width:200px" onclick="ghAutoSync(true)">🔄 Segerak dari GitHub</button>
+        <button class="btn" style="flex:none;padding:10px 12px" onclick="ghShowTab('form');ghNewConfig()">➕ Manual</button>
       </div>
     </div>
 
@@ -994,7 +996,7 @@ function ghShowTab(tab){
   document.getElementById('gh-tab-list').classList.toggle('active',isList);
   document.getElementById('gh-tab-token').classList.toggle('active',isToken);
   document.getElementById('gh-status').textContent='';
-  if(isList) ghRenderList();
+  if(isList){ ghRenderList(); ghAutoSync(false); }
   if(isToken){
     var t=ghGetToken();
     document.getElementById('gh-token').value=t;
@@ -1379,16 +1381,29 @@ function ghRenderList(){
   } else {
     deployOrig.style.display='none';
   }
-  if(!list.length){
-    el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app lagi. Tambah app baru.</div>';
+  var nTersembunyi=list.filter(function(c){return c.hidden;}).length;
+  if(!list.length||nTersembunyi===list.length&&!_ghShowHidden){
+    el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app lagi. Tekan 🔄 Segerak dari GitHub.</div>'+
+      (nTersembunyi?'<div style="text-align:center"><button class="tool-btn" onclick="_ghShowHidden=true;ghRenderList()" style="padding:4px 10px;font-size:11px">👁 Tunjuk tersembunyi ('+nTersembunyi+')</button></div>':'');
     return;
   }
   var html='';
   list.forEach(function(c,i){
+    if(c.hidden){
+      if(!_ghShowHidden) return;
+      html+='<div class="file-item" style="flex-wrap:wrap;gap:6px;opacity:0.6">'+
+        '<div class="file-info" style="flex:1;min-width:0">'+
+          '<div class="file-name">🙈 '+c.name+'</div>'+
+          '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
+        '</div>'+
+        '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="ghUnhideConfig('+i+')">↺ Papar</button>'+
+      '</div>';
+      return;
+    }
     var blocked=_ghGlobalLock||c.deployBlocked||false;
     html+='<div class="file-item" style="flex-wrap:wrap;gap:6px" id="gh-item-'+i+'">'+
       '<div class="file-info" style="width:100%">'+
-        '<div class="file-name">'+c.name+'</div>'+
+        '<div class="file-name">'+c.name+(c.auto?' <span style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 4px;margin-left:4px">auto</span>':'')+'</div>'+
         '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
         '<div class="gh-deploy-status" id="gh-ds-'+i+'" style="font-size:11px;margin-top:4px;min-height:14px">'+(blocked?'⏳ Menunggu Pages build...':'')+'</div>'+
         (blocked?'<div style="font-size:10px;color:var(--amber);font-style:italic;margin-top:2px">⚠ Deployment in progress — locked to prevent SHA conflicts. Press 🔍 to check.</div>':'')+
@@ -1398,9 +1413,13 @@ function ghRenderList(){
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="strukturBuka(\''+c.repo+'\',\''+(c.branch||'main')+'\')">🌳</button>'+
       '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--accent);color:var(--accent)" onclick="ghCheckStatus('+i+')">🔍</button>'+
       '<button class="btn amber" style="flex:none;padding:6px 10px" onclick="ghEditConfig('+i+')">✏</button>'+
-      '<button class="btn danger" style="flex:none;padding:6px 10px" onclick="ghDeleteConfig('+i+')">🗑</button>'+
+      '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--text2);color:var(--text2)" onclick="ghDeleteConfig('+i+')" title="Sembunyikan">🙈</button>'+
     '</div>';
   });
+  if(nTersembunyi){
+    html+='<div style="text-align:center;margin-top:6px"><button class="tool-btn" onclick="_ghShowHidden=!_ghShowHidden;ghRenderList()" style="padding:4px 10px;font-size:11px">'+
+      (_ghShowHidden?'🙈 Sorok yang tersembunyi':'👁 Tunjuk tersembunyi ('+nTersembunyi+')')+'</button></div>';
+  }
   el.innerHTML=html;
 }
 
@@ -1423,13 +1442,22 @@ function ghEditConfig(idx){
 }
 
 function ghDeleteConfig(idx){
-  var list=ghGetConfigs();
-  if(!confirm('Padam config "'+list[idx].name+'"?')) return;
-  list.splice(idx,1);
+  var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
+  if(!confirm('Sembunyikan "'+c.name+'" dari senarai?\n\n(Repo di GitHub tidak terjejas. Boleh dipapar semula melalui 👁 Tunjuk tersembunyi.)')) return;
+  c.hidden=true;
   _ghConfigs=list;
   ghSaveToFirebase().then(function(){
-    ghRenderList(); showNotif('Config dipadam','ok');
-  });
+    ghRenderList(); showNotif('🙈 '+c.name+' disembunyikan','ok');
+  }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
+}
+
+function ghUnhideConfig(idx){
+  var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
+  delete c.hidden;
+  _ghConfigs=list;
+  ghSaveToFirebase().then(function(){
+    ghRenderList(); showNotif('↺ '+c.name+' dipapar semula','ok');
+  }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
 }
 
 function ghSaveConfig(){
@@ -1441,13 +1469,60 @@ function ghSaveConfig(){
   if(!ghGetToken()){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
   var list=ghGetConfigs();
   var idx=parseInt(document.getElementById('gh-edit-idx').value);
-  var config={name:name,repo:repo,path:path,branch:branch};
+  var lama=idx>=0&&list[idx]?list[idx]:{};
+  var config=Object.assign({},lama,{name:name,repo:repo,path:path,branch:branch});
+  delete config.auto;
   if(idx>=0) list[idx]=config; else list.push(config);
   _ghConfigs=list;
   ghSaveToFirebase().then(function(){
     showNotif('Config disimpan!','ok');
     ghShowTab('list');
   }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
+}
+
+// ── Segerak automatik senarai app dari GitHub ──
+var _ghSyncDone=false,_ghShowHidden=false;
+async function ghAutoSync(manual){
+  var st=document.getElementById('gh-sync-status');
+  if(!ghGetToken()||!currentUser){
+    if(manual) showNotif('Simpan API Key dahulu dalam tab 🔑','err');
+    return;
+  }
+  if(_ghSyncDone&&!manual) return;
+  _ghSyncDone=true;
+  if(st){st.style.color='var(--text2)';st.textContent='⏳ Menyemak repo di GitHub...';}
+  try{
+    var semua=[];
+    for(var page=1;page<=5;page++){
+      var r=await impApi('GET','/user/repos?per_page=100&page='+page+'&affiliation=owner&sort=updated');
+      if(!Array.isArray(r)||!r.length) break;
+      semua=semua.concat(r);
+      if(r.length<100) break;
+    }
+    var list=ghGetConfigs(),ada={},baru=[];
+    list.forEach(function(c){ada[(c.repo||'').toLowerCase()]=1;});
+    semua.forEach(function(r){
+      if(r.archived||r.fork||!r.has_pages) return;
+      if(ada[r.full_name.toLowerCase()]) return;
+      list.push({name:r.name,repo:r.full_name,path:'index.html',branch:r.default_branch||'main',auto:true});
+      ada[r.full_name.toLowerCase()]=1;
+      baru.push(r.name);
+    });
+    var tanpaPages=semua.filter(function(r){return !r.archived&&!r.fork&&!r.has_pages&&!ada[r.full_name.toLowerCase()];}).length;
+    if(baru.length){
+      _ghConfigs=list;
+      await ghSaveToFirebase();
+    }
+    if(st){
+      st.style.color=baru.length?'var(--green)':'var(--text2)';
+      st.textContent=(baru.length?'✓ '+baru.length+' app baru dari GitHub: '+baru.join(', '):'✓ Senarai terkini · '+semua.length+' repo di GitHub')+
+        (tanpaPages?' · '+tanpaPages+' repo tanpa GitHub Pages tidak dipapar (guna ➕ Manual)':'');
+    }
+    ghRenderList();
+  }catch(e){
+    _ghSyncDone=false;
+    if(st){st.style.color='var(--red)';st.textContent='✕ Gagal segerak: '+e.message;}
+  }
 }
 
 function ghCheckStatus(idx){
@@ -2899,6 +2974,7 @@ function multiRenderPicker(){
   }
   var html='';
   configs.forEach(function(c,i){
+    if(c.hidden) return;
     var isAdded=_multiFiles.some(function(mf){return mf.config.repo===c.repo&&mf.config.path===c.path;});
     html+='<div class="picker-item">'+
       '<div class="file-info">'+
