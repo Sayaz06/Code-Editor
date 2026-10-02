@@ -477,6 +477,18 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
         <div id="zf-prog-txt" style="font-size:11px;color:var(--text2);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"></div>
       </div>
       <div id="zf-log" style="max-height:30vh;overflow-y:auto"></div>
+      <div style="border-top:1px solid var(--border);margin-top:12px;padding-top:10px">
+        <div class="field-label">☁ Proses di GitHub Actions — disyorkan untuk repo besar (tak perlu phone sentiasa hidup)</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="zf-worker" class="field field-sm" type="text" placeholder="owner/kodedit-worker" onchange="zfCloudSimpanWorker();zfCloudSenarai()" autocomplete="off" autocapitalize="off" spellcheck="false" style="flex:1;min-width:0">
+          <button class="btn primary" id="zf-btn-cloud" onclick="zfCloudMula()" style="flex:none;padding:10px 12px">☁ Proses di GitHub</button>
+        </div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin:10px 0 6px">
+          <span style="font-size:11px;color:var(--text2)">Job terkini</span>
+          <button class="tool-btn" onclick="zfCloudSenarai()" style="padding:4px 10px;font-size:11px;border-color:var(--accent);color:var(--accent)">🔍 Semak status</button>
+        </div>
+        <div id="zf-jobs"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -3982,7 +3994,7 @@ function zfBuka(){
   if(!blobs.length){showNotif('Tiada fail untuk dimuat turun','err');return;}
   var flat=zfFlatNames(blobs.map(function(x){return x.path;}));
   var sub=_stk.sub?_stk.sub+'/':'';
-  _zf.repo=_stk.repo; _zf.branch=_stk.branch; _zf.sub=_stk.sub||'';
+  _zf.repo=_stk.repo; _zf.branch=_stk.branch; _zf.sub=_stk.sub||''; _zf.q=q;
   _zf.list=blobs.map(function(x,i){return {path:x.path,full:sub+x.path,size:x.size||0,flat:flat[i]};});
   var total=_zf.list.reduce(function(s,f){return s+f.size;},0);
   var sama=_zf.list.filter(function(f){return f.flat!==f.path.split('/').pop();}).length;
@@ -3992,12 +4004,13 @@ function zfBuka(){
   document.getElementById('zf-ringkas').innerHTML=
     '<b>'+_zf.list.length+'</b> fail · <b>'+zfSaiz(total)+'</b>'+(q?' · tapisan "'+q.replace(/</g,'&lt;')+'"':'')+
     (sama?'<br><span style="color:var(--amber)">⚠ '+sama+' fail nama sama — akan dinamakan semula "(2)", "(3)"... Senarai asal dalam _PETA_FAIL.txt</span>':'')+
-    (besar?'<br><span style="color:var(--amber)">⚠ Repo besar — disyorkan guna Firebase Storage & pecah ZIP</span>':'');
-  document.getElementById('zf-storage').checked=besar;
+    (besar?'<br><span style="color:var(--amber)">⚠ Repo besar — disyorkan guna ☁ Proses di GitHub (di bawah)</span>':'');
+  document.getElementById('zf-storage').checked=false;
   document.getElementById('zf-part').value='f10';
   document.getElementById('zf-log').innerHTML='';
   document.getElementById('zf-prog-wrap').style.display='none';
   document.getElementById('zipflat-modal').style.display='flex';
+  zfCloudInit();
 }
 function zfTutup(){
   if(_zf.busy){document.getElementById('zipflat-modal').style.display='none';showNotif('ZIP masih berjalan di latar belakang','info');return;}
@@ -4186,6 +4199,142 @@ async function zfPadamCache(){
   }finally{
     zfKunci(false);
   }
+}
+
+// ═══════════════════════════════════
+// ZIP FLAT — GITHUB ACTIONS (☁)
+// ═══════════════════════════════════
+var _zfc={timer:null,wf:'zipflat.yml'};
+function zfCloudWorker(){
+  var el=document.getElementById('zf-worker');
+  return ((el&&el.value)||'').trim().replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/\/+$/,'');
+}
+function zfCloudInit(){
+  var el=document.getElementById('zf-worker');
+  if(el&&!el.value){
+    var v='';
+    try{v=localStorage.getItem('kodedit_worker')||'';}catch(e){}
+    if(!v){
+      var c=(ghGetConfigs()||[])[0];
+      if(c&&c.repo) v=c.repo.split('/')[0]+'/kodedit-worker';
+    }
+    el.value=v;
+  }
+  if(zfCloudWorker()) zfCloudSenarai();
+}
+function zfCloudSimpanWorker(){
+  try{localStorage.setItem('kodedit_worker',zfCloudWorker());}catch(e){}
+}
+async function zfCloudMula(){
+  if(!_zf.list){showNotif('Buka struktur repo dahulu','err');return;}
+  if(!ghGetToken()){showNotif('Simpan API Key dahulu dalam 🚀 Deploy → 🔑','err');return;}
+  var w=zfCloudWorker();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(w)){showNotif('Isi repo pekerja: owner/kodedit-worker','err');return;}
+  zfCloudSimpanWorker();
+  var pv=document.getElementById('zf-part').value||'0';
+  var per=pv.charAt(0)==='f'?(parseInt(pv.slice(1),10)||10):0;
+  if(pv.charAt(0)!=='f'&&pv!=='0'){showNotif('Mod ☁ hanya sokong "Pecah setiap N fail" atau "Satu ZIP"','err');return;}
+  var flat=document.getElementById('zf-flat').checked;
+  var jobId='zf-'+Date.now().toString(36)+'-'+(_zf.repo.split('/')[1]||'repo').replace(/[^\w.-]+/g,'_').slice(0,40);
+  var btn=document.getElementById('zf-btn-cloud');
+  btn.disabled=true; btn.textContent='⏳ Menghantar...';
+  try{
+    var info=await impApi('GET','/repos/'+w);
+    if(info.private) zfLog('⚠ Repo pekerja private — pautan muat turun mungkin tak boleh dibuka dari phone. Disyorkan public.','warn');
+    await impApi('POST','/repos/'+w+'/actions/workflows/'+_zfc.wf+'/dispatches',{
+      ref:info.default_branch||'main',
+      inputs:{
+        source:_zf.repo, branch:_zf.branch||'', sub:_zf.sub||'', filter:_zf.q||'',
+        flat:flat?'true':'false', per_zip:String(per), job_id:jobId
+      }
+    });
+    zfLog('☁ Job dihantar: '+jobId+' — GitHub sedang memproses. Boleh tutup app, semak semula nanti.','ok');
+    showNotif('☁ Job dihantar ke GitHub','ok');
+    setTimeout(zfCloudSenarai,4000);
+  }catch(e){
+    var m=e.message;
+    if(e.status===404) m='Repo pekerja / workflow '+_zfc.wf+' tidak dijumpai dalam '+w;
+    if(e.status===403) m+=' — token perlu kebenaran Actions (classic: repo + workflow)';
+    zfLog('✕ '+m,'err');
+  }finally{
+    btn.disabled=false; btn.textContent='☁ Proses di GitHub';
+  }
+}
+async function zfCloudSenarai(){
+  clearTimeout(_zfc.timer);
+  var w=zfCloudWorker(), box=document.getElementById('zf-jobs');
+  if(!box||!w) return;
+  if(!ghGetToken()){box.innerHTML='<div style="font-size:11px;color:var(--text2)">Simpan API Key untuk lihat job</div>';return;}
+  try{
+    var runs=await impApi('GET','/repos/'+w+'/actions/workflows/'+_zfc.wf+'/runs?per_page=10');
+    var rels=await impApi('GET','/repos/'+w+'/releases?per_page=30');
+    var relMap={};
+    (rels||[]).forEach(function(r){relMap[r.tag_name]=r;});
+    var list=(runs&&runs.workflow_runs)||[];
+    if(!list.length){box.innerHTML='<div style="font-size:11px;color:var(--text2)">Tiada job lagi</div>';return;}
+    var aktif=false,html='';
+    list.forEach(function(r){
+      var tajuk=r.display_title||r.name||'';
+      var job=tajuk.indexOf('zipflat ')===0?tajuk.slice(8):'';
+      var rel=job?relMap[job]:null;
+      var st,warna;
+      if(r.status!=='completed'){st=r.status==='queued'?'⏳ Menunggu giliran':'⚙ Sedang diproses';warna='var(--amber)';aktif=true;}
+      else if(r.conclusion==='success'){st='✓ Siap';warna='var(--green)';}
+      else if(r.conclusion==='cancelled'){st='⊘ Dibatalkan';warna='var(--text2)';}
+      else {st='✕ Gagal';warna='var(--red)';}
+      var masa=new Date(r.created_at).toLocaleString('ms-MY',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
+      var sumber=rel?rel.name.replace(/^ZIP /,''):job;
+      html+='<div style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px">'+
+        '<div style="display:flex;gap:6px;align-items:center">'+
+          '<span style="font-size:12px;color:'+warna+';font-weight:600">'+st+'</span>'+
+          '<span style="font-size:11px;color:var(--text2);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+sumber+'</span>'+
+          '<span style="font-size:10px;color:var(--text2)">'+masa+'</span>'+
+        '</div>';
+      if(rel&&rel.assets&&rel.assets.length){
+        html+='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
+        rel.assets.forEach(function(a){
+          html+='<button class="tool-btn" onclick="zfCloudMuatTurun(\''+a.browser_download_url.replace(/'/g,"\\'")+'\')" style="padding:4px 10px;font-size:11px;border-color:var(--green);color:var(--green)">⬇ '+a.name+' · '+zfSaiz(a.size)+'</button>';
+        });
+        html+='<button class="tool-btn" onclick="zfCloudPadam('+rel.id+',\''+rel.tag_name+'\')" style="padding:4px 8px;font-size:11px;border-color:var(--red);color:var(--red)">🗑</button>';
+        html+='</div>';
+      }
+      if(r.status==='completed'&&r.conclusion!=='success'){
+        html+='<div style="display:flex;gap:6px;margin-top:6px">'+
+          '<button class="tool-btn" onclick="zfCloudUlang('+r.id+')" style="padding:4px 10px;font-size:11px;border-color:var(--amber);color:var(--amber)">↻ Ulang</button>'+
+          '<button class="tool-btn" onclick="window.open(\''+r.html_url+'\',\'_blank\')" style="padding:4px 10px;font-size:11px">📄 Log</button>'+
+        '</div>';
+      }
+      html+='</div>';
+    });
+    box.innerHTML=html;
+    var modal=document.getElementById('zipflat-modal');
+    if(aktif&&modal&&modal.style.display==='flex') _zfc.timer=setTimeout(zfCloudSenarai,10000);
+  }catch(e){
+    var m=e.status===404?'Repo pekerja / workflow tidak dijumpai: '+w:e.message;
+    box.innerHTML='<div style="font-size:11px;color:var(--red)">✕ '+m+'</div>';
+  }
+}
+function zfCloudMuatTurun(url){
+  var a=document.createElement('a'); a.href=url; a.target='_blank'; a.rel='noopener';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+async function zfCloudUlang(runId){
+  var w=zfCloudWorker();
+  try{
+    await impApi('POST','/repos/'+w+'/actions/runs/'+runId+'/rerun');
+    showNotif('↻ Job diulang','ok');
+    setTimeout(zfCloudSenarai,3000);
+  }catch(e){showNotif('Gagal ulang: '+e.message,'err');}
+}
+async function zfCloudPadam(relId,tag){
+  if(!confirm('Padam hasil ZIP ini dari GitHub Release?')) return;
+  var w=zfCloudWorker();
+  try{
+    await impApi('DELETE','/repos/'+w+'/releases/'+relId);
+    await impApi('DELETE','/repos/'+w+'/git/refs/tags/'+encodeURIComponent(tag)).catch(function(){});
+    showNotif('🗑 Dipadam','ok');
+    zfCloudSenarai();
+  }catch(e){showNotif('Gagal padam: '+e.message,'err');}
 }
 function strukturRender(){
   if(_stk.src==='file'){strukturRenderFail();return;}
