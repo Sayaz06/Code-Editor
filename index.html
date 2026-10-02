@@ -455,10 +455,14 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
       <label style="display:flex;gap:8px;align-items:flex-start;font-size:12px;color:var(--text);margin-bottom:8px"><input type="checkbox" id="zf-storage" style="margin-top:2px"> <span>Simpan ke Firebase Storage dulu<br><span style="color:var(--text2);font-size:11px">Untuk repo besar · jimat RAM · boleh sambung jika terputus</span></span></label>
       <div class="field-label">Pecah ZIP</div>
       <select id="zf-part" class="field field-sm" style="margin-bottom:10px">
-        <option value="0">Satu ZIP sahaja</option>
+        <option value="f10">Pecah setiap 10 fail</option>
+        <option value="f20">Pecah setiap 20 fail</option>
+        <option value="f50">Pecah setiap 50 fail</option>
+        <option value="f100">Pecah setiap 100 fail</option>
         <option value="25">Pecah setiap 25MB</option>
         <option value="50">Pecah setiap 50MB</option>
         <option value="100">Pecah setiap 100MB</option>
+        <option value="0">Satu ZIP sahaja</option>
       </select>
       <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px">
         <button class="btn success" id="zf-btn-mula" onclick="zfMula()">▶ Mula</button>
@@ -3990,7 +3994,7 @@ function zfBuka(){
     (sama?'<br><span style="color:var(--amber)">⚠ '+sama+' fail nama sama — akan dinamakan semula "(2)", "(3)"... Senarai asal dalam _PETA_FAIL.txt</span>':'')+
     (besar?'<br><span style="color:var(--amber)">⚠ Repo besar — disyorkan guna Firebase Storage & pecah ZIP</span>':'');
   document.getElementById('zf-storage').checked=besar;
-  document.getElementById('zf-part').value=besar?'50':'0';
+  document.getElementById('zf-part').value='f10';
   document.getElementById('zf-log').innerHTML='';
   document.getElementById('zf-prog-wrap').style.display='none';
   document.getElementById('zipflat-modal').style.display='flex';
@@ -4068,8 +4072,11 @@ async function zfMula(){
   var list=_zf.list,N=list.length;
   var flat=document.getElementById('zf-flat').checked;
   var guna=document.getElementById('zf-storage').checked;
-  var partMB=parseInt(document.getElementById('zf-part').value,10)||0;
+  var partVal=document.getElementById('zf-part').value||'0';
+  var hadFail=partVal.charAt(0)==='f'?(parseInt(partVal.slice(1),10)||0):0;
+  var partMB=hadFail?0:(parseInt(partVal,10)||0);
   if(guna&&!currentUser){showNotif('Log masuk dahulu untuk guna Firebase Storage','err');return;}
+  if(hadFail&&Math.ceil(N/hadFail)>50&&!confirm('Ini akan hasilkan '+Math.ceil(N/hadFail)+' fail ZIP (setiap satu '+hadFail+' fail).\nBrowser mungkin minta izin "muat turun berbilang".\n\nTeruskan?')) return;
   _zf.batal=false; zfKunci(true);
   document.getElementById('zf-log').innerHTML='';
   var data=new Array(N);
@@ -4104,13 +4111,16 @@ async function zfMula(){
     zfLog('✓ Semua '+N+' fail dimuat turun','ok');
     // ── TAHAP 2: BINA ZIP ──
     var had=partMB?partMB*1048576:0;
+    var jumBhg=hadFail?Math.ceil(N/hadFail):0;
+    if(hadFail) zfLog('Akan hasilkan '+jumBhg+' fail ZIP · '+hadFail+' fail setiap satu');
     var asas=(_zf.repo.split('/')[1]||'repo')+(_zf.sub?'-'+_zf.sub.replace(/\//g,'-'):'')+(flat?'-flat':'');
     asas=asas.replace(/[^\w.\-]+/g,'_');
     var zip=new JSZip(),cur=0,bahagian=1,dalamZip=0;
     var peta=list.map(function(f){return (flat?f.flat:f.path)+'  ←  '+f.path;}).join('\n');
     zip.file('_PETA_FAIL.txt','Sumber: https://github.com/'+_zf.repo+'/tree/'+_zf.branch+(_zf.sub?'/'+_zf.sub:'')+'\nJumlah: '+N+' fail\n\n'+peta);
     var jana=async function(akhir){
-      var nama=asas+((had&&!(akhir&&bahagian===1))?'-bahagian'+bahagian:'')+'.zip';
+      var noB=hadFail?String(bahagian).padStart(String(jumBhg).length,'0'):String(bahagian);
+      var nama=asas+(((had||hadFail)&&!(akhir&&bahagian===1))?'-bahagian'+noB:'')+'.zip';
       zfLog('Membina '+nama+' ('+dalamZip+' fail)...');
       var out=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:5},streamFiles:true},function(m){
         document.getElementById('zf-prog-txt').textContent='Memampat '+nama+' · '+Math.round(m.percent)+'%';
@@ -4131,7 +4141,7 @@ async function zfMula(){
           return await r.blob();
         },2);
       } else { b=data[i]; data[i]=null; }
-      if(had&&cur>0&&cur+b.size>had) await jana(false);
+      if((had&&cur>0&&cur+b.size>had)||(hadFail&&dalamZip>=hadFail)) await jana(false);
       zip.file(flat?f.flat:f.path,await b.arrayBuffer(),{binary:true});
       cur+=b.size; dalamZip++;
       zfProg('2/2 Bina ZIP',i+1,N,f.path.split('/').pop());
