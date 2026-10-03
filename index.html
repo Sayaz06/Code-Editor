@@ -601,14 +601,19 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <!-- FORM TAMBAH/EDIT APP -->
     <div id="gh-form-view" style="display:none">
       <input type="hidden" id="gh-edit-idx" value="-1">
-      <div class="field-label">Nama App (untuk rujukan)</div>
+      <div class="field-label">Nama App (untuk rujukan — kosong = guna nama repo)</div>
       <input class="field field-sm" id="gh-name" type="text" placeholder="contoh: App Istigfar">
-      <div class="field-label" style="margin-top:10px">Owner / Repo</div>
-      <input class="field field-sm" id="gh-repo" type="text" placeholder="sayaz06/nama-repo">
-      <div class="field-label" style="margin-top:10px">Path fail dalam repo</div>
-      <input class="field field-sm" id="gh-path" type="text" placeholder="index.html">
-      <div class="field-label" style="margin-top:10px">Branch</div>
-      <input class="field field-sm" id="gh-branch" type="text" placeholder="main">
+      <div class="field-label" style="margin-top:10px">Repo</div>
+      <input class="field field-sm" id="gh-repo" type="text" list="gh-repo-list" placeholder="pilih atau taip nama repo" oninput="ghRepoBerubah()" autocomplete="off" autocapitalize="off" spellcheck="false">
+      <datalist id="gh-repo-list"></datalist>
+      <div id="gh-kesan" style="font-size:11px;color:var(--text2);margin-top:6px;min-height:14px;word-break:break-word"></div>
+      <button class="tool-btn" type="button" onclick="ghTogolLanjutan()" style="margin-top:8px;padding:4px 10px;font-size:11px">⚙ Lanjutan (fail & branch)</button>
+      <div id="gh-lanjutan" style="display:none">
+        <div class="field-label" style="margin-top:10px">Path fail dalam repo (dikesan sendiri)</div>
+        <input class="field field-sm" id="gh-path" type="text" placeholder="index.html" oninput="_ghPathManual=true">
+        <div class="field-label" style="margin-top:10px">Branch (dikesan sendiri)</div>
+        <input class="field field-sm" id="gh-branch" type="text" placeholder="main" oninput="_ghPathManual=true">
+      </div>
     </div>
 
     <!-- TAB API KEY -->
@@ -1458,12 +1463,105 @@ function ghRenderList(){
   el.innerHTML=html;
 }
 
+// ── Borang app: cuma Nama + Repo, path & branch dikesan sendiri ──
+var _ghRepoCache=null,_ghLogin='',_ghPathManual=false,_ghEditAsal='',_ghKesanTimer=null,_ghKesanUntuk='';
+async function ghIsiSenaraiRepo(){
+  var dl=document.getElementById('gh-repo-list'); if(!dl||!ghGetToken()) return;
+  try{
+    if(!_ghLogin){ var u=await impApi('GET','/user'); _ghLogin=u.login||''; }
+    if(!_ghRepoCache){
+      var semua=[];
+      for(var page=1;page<=5;page++){
+        var r=await impApi('GET','/user/repos?per_page=100&page='+page+'&affiliation=owner&sort=updated');
+        if(!Array.isArray(r)||!r.length) break;
+        semua=semua.concat(r); if(r.length<100) break;
+      }
+      _ghRepoCache=semua;
+    }
+    dl.innerHTML=_ghRepoCache.map(function(r){return '<option value="'+r.name+'">';}).join('');
+  }catch(e){}
+}
+function _ghRepoPenuh(v){
+  v=(v||'').trim().replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/\.git$/,'').replace(/\/+$/,'');
+  if(!v) return '';
+  var p=v.split('/');
+  if(p.length>=2&&p[0]&&p[1]) return p[0]+'/'+p[1];
+  var jumpa=(_ghRepoCache||[]).filter(function(r){return r.name.toLowerCase()===v.toLowerCase();})[0];
+  if(jumpa) return jumpa.full_name;
+  return _ghLogin?_ghLogin+'/'+v:'';
+}
+function ghRepoBerubah(){
+  var full=_ghRepoPenuh(document.getElementById('gh-repo').value);
+  if(_ghEditAsal&&full.toLowerCase()!==_ghEditAsal.toLowerCase()) _ghPathManual=false;
+  _ghKesanUntuk='';
+  clearTimeout(_ghKesanTimer);
+  if(!_ghPathManual) _ghKesanTimer=setTimeout(function(){ghAutoKesan();},700);
+}
+function ghTogolLanjutan(){
+  var el=document.getElementById('gh-lanjutan');
+  el.style.display=el.style.display==='none'?'block':'none';
+}
+async function _ghFailUtama(full,branch){
+  var root=await impApi('GET','/repos/'+full+'/contents/?ref='+encodeURIComponent(branch)).catch(function(){return [];});
+  if(Array.isArray(root)){
+    var idx=root.filter(function(f){return f.type==='file'&&/^index\.html?$/i.test(f.name);})[0];
+    if(idx) return {path:idx.path,sebab:'index.html dijumpai'};
+  }
+  var commits=await impApi('GET','/repos/'+full+'/commits?sha='+encodeURIComponent(branch)+'&per_page=10').catch(function(){return [];});
+  var butiran=await Promise.all((Array.isArray(commits)?commits:[]).slice(0,10).map(function(c){
+    return impApi('GET','/repos/'+full+'/commits/'+c.sha).catch(function(){return null;});
+  }));
+  var kira={},terkini={},urut=0;
+  butiran.forEach(function(d){
+    ((d&&d.files)||[]).forEach(function(f){
+      if(f.status==='removed') return;
+      kira[f.filename]=(kira[f.filename]||0)+1;
+      if(terkini[f.filename]===undefined) terkini[f.filename]=urut++;
+    });
+  });
+  var calon=Object.keys(kira);
+  var kod=calon.filter(function(n){return /\.(html?|js|mjs|css|json|py|ts|php|md|txt|xml)$/i.test(n);});
+  if(kod.length) calon=kod;
+  calon.sort(function(a,b){return (kira[b]-kira[a])||(terkini[a]-terkini[b]);});
+  if(calon.length) return {path:calon[0],sebab:'paling kerap diedit ('+kira[calon[0]]+'× dalam '+butiran.length+' commit terakhir)'};
+  var f1=Array.isArray(root)?root.filter(function(f){return f.type==='file';})[0]:null;
+  if(f1) return {path:f1.path,sebab:'fail pertama dalam repo'};
+  return {path:'index.html',sebab:'repo kosong — fail baru'};
+}
+async function ghAutoKesan(){
+  var info=document.getElementById('gh-kesan');
+  if(!_ghLogin) await ghIsiSenaraiRepo();
+  var full=_ghRepoPenuh(document.getElementById('gh-repo').value);
+  if(!full){ if(info) info.textContent=''; return null; }
+  if(_ghKesanUntuk===full) return full;
+  if(info){info.style.color='var(--text2)';info.textContent='⏳ Mengesan '+full+'...';}
+  try{
+    var r=await impApi('GET','/repos/'+full);
+    full=r.full_name;
+    var branch=r.default_branch||'main';
+    if(!_ghPathManual){
+      var f=await _ghFailUtama(full,branch);
+      document.getElementById('gh-path').value=f.path;
+      document.getElementById('gh-branch').value=branch;
+      if(info){info.style.color='var(--green)';info.textContent='✓ '+full+' · '+f.path+' ('+f.sebab+') · branch '+branch;}
+    } else if(info){info.style.color='var(--green)';info.textContent='✓ '+full;}
+    _ghKesanUntuk=full;
+    return full;
+  }catch(e){
+    if(info){info.style.color='var(--red)';info.textContent='✕ '+(e.status===404?'Repo tidak dijumpai: '+full:e.message);}
+    return null;
+  }
+}
 function ghNewConfig(){
   document.getElementById('gh-edit-idx').value='-1';
   document.getElementById('gh-name').value='';
   document.getElementById('gh-repo').value='';
   document.getElementById('gh-path').value='';
-  document.getElementById('gh-branch').value='main';
+  document.getElementById('gh-branch').value='';
+  document.getElementById('gh-kesan').textContent='';
+  document.getElementById('gh-lanjutan').style.display='none';
+  _ghPathManual=false; _ghEditAsal=''; _ghKesanUntuk='';
+  ghIsiSenaraiRepo();
 }
 
 function ghEditConfig(idx){
@@ -1473,6 +1571,10 @@ function ghEditConfig(idx){
   document.getElementById('gh-repo').value=c.repo||'';
   document.getElementById('gh-path').value=c.path||'';
   document.getElementById('gh-branch').value=c.branch||'main';
+  document.getElementById('gh-kesan').textContent='';
+  document.getElementById('gh-lanjutan').style.display='none';
+  _ghPathManual=true; _ghEditAsal=c.repo||''; _ghKesanUntuk=c.repo||'';
+  ghIsiSenaraiRepo();
   ghShowTab('form');
 }
 
@@ -1502,10 +1604,15 @@ function ghPulihRepo(repo){
   }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
 }
 
-function ghSaveConfig(){
-  var name=document.getElementById('gh-name').value.trim();
-  var repo=document.getElementById('gh-repo').value.trim().replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/\/+$/,'');
-  var path=document.getElementById('gh-path').value.trim().replace(/^\/+/,'');
+async function ghSaveConfig(){
+  if(!ghGetToken()){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
+  if(!document.getElementById('gh-repo').value.trim()){showNotif('Pilih atau taip nama repo','err');return;}
+  var full=await ghAutoKesan();
+  if(!full){showNotif('Repo tidak dijumpai — semak nama repo','err');return;}
+  document.getElementById('gh-repo').value=full;
+  var name=document.getElementById('gh-name').value.trim()||full.split('/')[1];
+  var repo=full;
+  var path=document.getElementById('gh-path').value.trim().replace(/^\/+/,'')||'index.html';
   var branch=document.getElementById('gh-branch').value.trim()||'main';
   if(!name||!repo||!path){showNotif('Isi semua field','err');return;}
   if(!ghGetToken()){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
@@ -1547,6 +1654,7 @@ async function ghAutoSync(manual){
       semua=semua.concat(r);
       if(r.length<100) break;
     }
+    _ghRepoCache=semua;
     var list=ghGetConfigs(),ada={},baru=[];
     list.forEach(function(c){ada[(c.repo||'').toLowerCase()]=1;});
     (_ghAbaikan||[]).forEach(function(r){ada[r]=1;});
