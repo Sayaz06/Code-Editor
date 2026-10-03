@@ -135,6 +135,9 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
 .file-item.active-file{border-color:var(--green)}
 .file-icon{font-size:18px;flex-shrink:0}
 .file-info{flex:1;overflow:hidden}
+#gh-apps-list .file-item[id^="gh-item-"]{flex-wrap:wrap!important}
+#gh-apps-list .file-item[id^="gh-item-"]>.file-info{flex:0 0 100%!important;width:100%!important;max-width:100%;min-width:0}
+#gh-apps-list .file-item[id^="gh-item-"] .file-meta,#gh-apps-list .file-item[id^="gh-item-"] .gh-deploy-status{white-space:normal;word-break:break-word}
 .file-name{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .file-meta{font-size:11px;color:var(--text2);margin-top:2px}
 .file-act{padding:4px 8px;border-radius:6px;border:1px solid var(--border);background:transparent;color:var(--text2);font-size:11px;cursor:pointer;flex-shrink:0}
@@ -924,7 +927,9 @@ function ghLoadFromFirebase(callback){
       var d = doc.data();
       _ghToken = d.token||'';
       _ghConfigs = d.configs||[];
+      _ghAbaikan = d.abaikan||[];
       _ghGlobalLock = d.globalLock||false;
+      if(ghKemasSenarai()) ghSaveToFirebase();
       if(_ghGlobalLock){
         var anyBlocked=_ghConfigs.some(function(c){ return c.deployBlocked; });
         if(!anyBlocked){
@@ -956,12 +961,33 @@ function ghLoadFromFirebase(callback){
 }
 
 function ghSaveToFirebase(){
-  if(!currentUser){ showNotif('Log masuk dahulu','err'); return; }
+  if(!currentUser){ showNotif('Log masuk dahulu','err'); return Promise.reject(new Error('Belum log masuk')); }
   return ghFbDoc().set({
     token: _ghToken,
     configs: _ghConfigs,
+    abaikan: _ghAbaikan||[],
     globalLock: _ghGlobalLock||false
   });
+}
+
+// ── Kemas senarai: buang pendua & tukar entri "tersembunyi" lama kepada senarai abaikan ──
+var _ghAbaikan=[];
+function ghKemasSenarai(){
+  var lama=_ghConfigs.length,seen={},baru=[],abaiLama=_ghAbaikan.length;
+  _ghConfigs.forEach(function(c){
+    if(!c||!c.repo) return;
+    var rk=c.repo.toLowerCase();
+    if(c.hidden){ if(_ghAbaikan.indexOf(rk)<0) _ghAbaikan.push(rk); return; }
+    var k=rk+'|'+(c.path||'').toLowerCase()+'|'+(c.branch||'main').toLowerCase();
+    if(seen[k]!==undefined){
+      var p=baru[seen[k]];
+      if(p.auto&&!c.auto) baru[seen[k]]=c;
+      return;
+    }
+    seen[k]=baru.length; baru.push(c);
+  });
+  _ghConfigs=baru;
+  return baru.length!==lama||_ghAbaikan.length!==abaiLama;
 }
 
 function ghGetConfigs(){ return _ghConfigs; }
@@ -1508,6 +1534,7 @@ async function ghAutoSync(manual){
     }
     var list=ghGetConfigs(),ada={},baru=[];
     list.forEach(function(c){ada[(c.repo||'').toLowerCase()]=1;});
+    (_ghAbaikan||[]).forEach(function(r){ada[r]=1;});
     semua.forEach(function(r){
       if(r.archived||r.fork||!r.has_pages) return;
       if(ada[r.full_name.toLowerCase()]) return;
