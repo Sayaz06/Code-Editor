@@ -344,6 +344,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <div style="background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:72vh;display:flex;flex-direction:column">
     <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
       <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="filepick-title">Pilih Fail</span>
+      <button class="tool-btn" onclick="fpFailBaru()" style="padding:0 8px;height:26px;font-size:11px;border-color:var(--green);color:var(--green);flex-shrink:0">➕ Baru</button>
       <button class="tool-btn" onclick="fpMuatTurunSemua()" style="padding:0 8px;height:26px;font-size:11px;border-color:var(--accent2);color:var(--accent2);flex-shrink:0">⬇ Semua</button>
       <button class="tool-btn" onclick="hideFilePicker()" style="padding:0 8px;height:26px;font-size:11px;flex-shrink:0">✕ Tutup</button>
     </div>
@@ -633,6 +634,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   </div>
   <div class="panel-footer" id="gh-footer-browse" style="display:none">
     <button class="btn" onclick="ghShowTab('list')">← Senarai App</button>
+    <button class="btn" onclick="ghFailBaru()" style="border-color:var(--green);color:var(--green)">➕ Fail Baru di sini</button>
   </div>
 </div>
 
@@ -1192,13 +1194,16 @@ function ghFetchBrowse(path){
       data.forEach(function(item){
         var icon=item.type==='dir'?'📁':'📄';
         var isCode=item.name.match(/\.(html|htm|js|css|txt|json|md|xml|php|py)$/i);
-        html+='<div class="file-item" onclick="ghBrowseItem(\''+item.path.replace(/'/g,"\\'") +'\',\''+item.type+'\')">'+
+        var pEsc=item.path.replace(/'/g,"\\'");
+        html+='<div class="file-item" onclick="ghBrowseItem(\''+pEsc+'\',\''+item.type+'\')">'+
           '<span class="file-icon">'+icon+'</span>'+
-          '<div class="file-info">'+
+          '<div class="file-info" style="min-width:0">'+
             '<div class="file-name">'+item.name+'</div>'+
             '<div class="file-meta">'+(item.type==='dir'?'Folder':(item.size>1024?Math.round(item.size/1024)+' KB':item.size+' B'))+'</div>'+
           '</div>'+
-          (item.type==='file'&&isCode?'<button class="file-act" onclick="event.stopPropagation();ghBrowseOpen(\''+item.path.replace(/'/g,"\\'")+'\')">Buka</button>':'')+
+          (item.type==='file'&&isCode?'<button class="file-act" onclick="event.stopPropagation();ghBrowseOpen(\''+pEsc+'\')">Buka</button>':'')+
+          (item.type==='file'?'<button class="file-act" title="Muat turun" onclick="event.stopPropagation();ghBrowseMuatTurun(\''+pEsc+'\')">⬇</button>'+
+            '<button class="file-act" title="Padam" style="border-color:var(--red);color:var(--red)" onclick="event.stopPropagation();ghBrowsePadam(\''+pEsc+'\')">🗑</button>':'')+
         '</div>';
       });
       browseList.innerHTML=html||'<div style="color:var(--text2);font-size:13px;padding:10px">Folder kosong</div>';
@@ -1410,28 +1415,14 @@ function ghRenderList(){
   } else {
     deployOrig.style.display='none';
   }
-  var nTersembunyi=list.filter(function(c){return c.hidden;}).length;
-  if(!list.length||nTersembunyi===list.length&&!_ghShowHidden){
-    el.innerHTML='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app lagi. Tekan 🔄 Segerak dari GitHub.</div>'+
-      (nTersembunyi?'<div style="text-align:center"><button class="tool-btn" onclick="_ghShowHidden=true;ghRenderList()" style="padding:4px 10px;font-size:11px">🗑 Lihat yang dibuang ('+nTersembunyi+')</button></div>':'');
-    return;
-  }
   var html='';
+  if(!list.length){
+    html='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app lagi. Tekan 🔄 Segerak dari GitHub.</div>';
+  }
   list.forEach(function(c,i){
-    if(c.hidden){
-      if(!_ghShowHidden) return;
-      html+='<div class="file-item" style="flex-wrap:wrap;gap:6px;opacity:0.6">'+
-        '<div class="file-info" style="flex:1;min-width:0">'+
-          '<div class="file-name">🗑 '+c.name+'</div>'+
-          '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
-        '</div>'+
-        '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="ghUnhideConfig('+i+')">↺ Papar</button>'+
-      '</div>';
-      return;
-    }
     var blocked=_ghGlobalLock||c.deployBlocked||false;
     html+='<div class="file-item" style="flex-wrap:wrap;gap:6px" id="gh-item-'+i+'">'+
-      '<div class="file-info" style="width:100%">'+
+      '<div class="file-info" style="flex:0 0 100%;min-width:0">'+
         '<div class="file-name">'+c.name+(c.auto?' <span style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 4px;margin-left:4px">auto</span>':'')+'</div>'+
         '<div class="file-meta">'+c.repo+' → '+c.path+' ('+c.branch+')</div>'+
         '<div class="gh-deploy-status" id="gh-ds-'+i+'" style="font-size:11px;margin-top:4px;min-height:14px">'+(blocked?'⏳ Menunggu Pages build...':'')+'</div>'+
@@ -1445,9 +1436,18 @@ function ghRenderList(){
       '<button class="btn danger" style="flex:none;padding:6px 10px" onclick="ghDeleteConfig('+i+')" title="Buang dari senarai">🗑</button>'+
     '</div>';
   });
-  if(nTersembunyi){
+  var ab=_ghAbaikan||[];
+  if(ab.length){
     html+='<div style="text-align:center;margin-top:6px"><button class="tool-btn" onclick="_ghShowHidden=!_ghShowHidden;ghRenderList()" style="padding:4px 10px;font-size:11px">'+
-      (_ghShowHidden?'Sorok senarai yang dibuang':'🗑 Lihat yang dibuang ('+nTersembunyi+')')+'</button></div>';
+      (_ghShowHidden?'Sorok senarai yang dibuang':'🗑 Repo yang dibuang ('+ab.length+')')+'</button></div>';
+    if(_ghShowHidden){
+      ab.forEach(function(r){
+        html+='<div class="file-item" style="gap:6px;opacity:0.7">'+
+          '<div class="file-info" style="flex:1;min-width:0"><div class="file-meta">🗑 '+r+'</div></div>'+
+          '<button class="btn" style="flex:none;padding:6px 10px;border-color:var(--green);color:var(--green)" onclick="ghPulihRepo(\''+r.replace(/'/g,"\\'")+'\')">↺ Pulih</button>'+
+        '</div>';
+      });
+    }
   }
   el.innerHTML=html;
 }
@@ -1472,41 +1472,50 @@ function ghEditConfig(idx){
 
 function ghDeleteConfig(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
-  if(!confirm('Buang "'+c.name+'" dari senarai Deploy?\n\nRepo di GitHub TIDAK dipadam. Segerak tidak akan menambahnya semula.\n(Boleh dikembalikan melalui 🗑 Lihat yang dibuang → ↺ Papar)')) return;
-  c.hidden=true;
+  if(!confirm('Buang "'+c.name+'" dari senarai Deploy?\n\n('+c.repo+' → '+c.path+')\nRepo di GitHub TIDAK dipadam.')) return;
+  var salinan=list.slice(),abSalinan=(_ghAbaikan||[]).slice();
+  list.splice(idx,1);
+  var rk=(c.repo||'').toLowerCase();
+  var masihAda=list.some(function(x){return (x.repo||'').toLowerCase()===rk;});
+  if(!masihAda&&_ghAbaikan.indexOf(rk)<0) _ghAbaikan.push(rk);
   _ghConfigs=list;
-  _ghShowHidden=false;
+  ghRenderList();
   ghSaveToFirebase().then(function(){
-    ghRenderList(); showNotif('🗑 '+c.name+' dibuang dari senarai','ok');
+    showNotif('🗑 '+c.name+' dibuang','ok');
   }).catch(function(e){
-    delete c.hidden; ghRenderList();
+    _ghConfigs=salinan; _ghAbaikan=abSalinan; ghRenderList();
     showNotif('Gagal simpan ke Firebase: '+e.message,'err');
   });
 }
 
-function ghUnhideConfig(idx){
-  var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
-  delete c.hidden;
-  _ghConfigs=list;
+function ghPulihRepo(repo){
+  _ghAbaikan=(_ghAbaikan||[]).filter(function(r){return r!==repo;});
   ghSaveToFirebase().then(function(){
-    ghRenderList(); showNotif('↺ '+c.name+' dipapar semula','ok');
+    showNotif('↺ '+repo+' dipulihkan','ok');
+    ghAutoSync(true);
   }).catch(function(e){ showNotif('Gagal simpan: '+e.message,'err'); });
 }
 
 function ghSaveConfig(){
   var name=document.getElementById('gh-name').value.trim();
-  var repo=document.getElementById('gh-repo').value.trim();
-  var path=document.getElementById('gh-path').value.trim();
+  var repo=document.getElementById('gh-repo').value.trim().replace(/^https?:\/\/(www\.)?github\.com\//i,'').replace(/\/+$/,'');
+  var path=document.getElementById('gh-path').value.trim().replace(/^\/+/,'');
   var branch=document.getElementById('gh-branch').value.trim()||'main';
   if(!name||!repo||!path){showNotif('Isi semua field','err');return;}
   if(!ghGetToken()){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
   var list=ghGetConfigs();
   var idx=parseInt(document.getElementById('gh-edit-idx').value);
+  var kunci=repo.toLowerCase()+'|'+path.toLowerCase()+'|'+branch.toLowerCase();
+  var pendua=list.some(function(c,j){
+    return j!==idx&&((c.repo||'').toLowerCase()+'|'+(c.path||'').toLowerCase()+'|'+(c.branch||'main').toLowerCase())===kunci;
+  });
+  if(pendua){showNotif('App ini sudah ada dalam senarai ('+repo+' → '+path+')','err');return;}
   var lama=idx>=0&&list[idx]?list[idx]:{};
   var config=Object.assign({},lama,{name:name,repo:repo,path:path,branch:branch});
-  delete config.auto;
+  delete config.auto; delete config.hidden;
   if(idx>=0) list[idx]=config; else list.push(config);
   _ghConfigs=list;
+  _ghAbaikan=(_ghAbaikan||[]).filter(function(r){return r!==repo.toLowerCase();});
   ghSaveToFirebase().then(function(){
     showNotif('Config disimpan!','ok');
     ghShowTab('list');
@@ -3453,6 +3462,60 @@ function hideFilePicker(){
   var el=document.getElementById('multi-filepick');
   if(el)el.style.display='none';
 }
+// ── Fail baru (mod biasa & mod berbilang) ──
+function _failBaruNama(asas){
+  var n=prompt('Nama fail baru'+(asas?' (dalam folder '+asas+'/)':'')+':\ncth: sw.js, manifest.json, css/gaya.css','');
+  if(n===null) return null;
+  n=n.trim().replace(/^\/+|\/+$/g,'');
+  if(!n) return null;
+  if(/(^|\/)\.\.?(\/|$)/.test(n)||/[\\:*?"<>|]/.test(n)){showNotif('Nama fail tidak sah','err');return null;}
+  return (asas?asas+'/':'')+n;
+}
+async function _failWujud(repo,path,branch){
+  var h={'Accept':'application/vnd.github.v3+json'};
+  var t=ghGetToken(); if(t) h['Authorization']='token '+t;
+  var url='https://api.github.com/repos/'+repo+'/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(branch||'main');
+  var r=await fetch(url,{headers:h});
+  if(r.status===404) return false;
+  if(!r.ok) throw new Error('Gagal semak fail (HTTP '+r.status+')');
+  var d=await r.json();
+  if(Array.isArray(d)) throw new Error('"'+path+'" ialah folder, bukan fail');
+  return true;
+}
+async function fpFailBaru(){
+  var i=_fpCardIdx,mf=_multiFiles[i];
+  if(!mf){showNotif('Pilih app dahulu','err');return;}
+  var path=_failBaruNama(_fpPath); if(!path) return;
+  try{
+    if(await _failWujud(mf.config.repo,path,mf.config.branch)){
+      showNotif('Fail sudah wujud — dibuka','info'); fpSelectFile(i,path); return;
+    }
+  }catch(e){ showNotif('✕ '+e.message,'err'); return; }
+  mf.config=Object.assign({},mf.config,{path:path});
+  mf.content=''; mf.editContent=''; mf.hasLocalEdit=true; mf.loaded=true; mf.isNew=true;
+  mf.status='🆕 Fail baru (belum wujud di GitHub) — isi kod, kemudian 🚀 Deploy';
+  mf.statusType='info';
+  hideFilePicker();
+  multiRender();
+  showNotif('🆕 '+path+' sedia — tampal kod dalam kotak kecil atau tekan 📝 Edit','ok');
+}
+async function ghFailBaru(){
+  var list=ghGetConfigs(),c=list[_ghBrowseIdx];
+  if(!c){showNotif('Pilih app dahulu','err');return;}
+  var path=_failBaruNama(_ghBrowsePath); if(!path) return;
+  try{
+    if(await _failWujud(c.repo,path,c.branch)){
+      showNotif('Fail sudah wujud — dibuka','info'); ghBrowseOpen(path); return;
+    }
+  }catch(e){ showNotif('✕ '+e.message,'err'); return; }
+  pushUndo();
+  S.fileName=path.split('/').pop(); S.filePath=path; S.fileRepo=c.repo; S.fileBranch=c.branch||'main';
+  inp().value='';
+  updateAll(); saveToStorage();
+  document.getElementById('status-file').textContent=S.fileName;
+  closeAllPanels();
+  showNotif('🆕 '+path+' — tulis/tampal kod, kemudian 🚀 Deploy → Deploy to Original Path','ok');
+}
 var _fpPath='';
 function fpMuatTurunSemua(){
   var mf=_multiFiles[_fpCardIdx];
@@ -3497,7 +3560,12 @@ function fpBrowse(cardIdx,path){
         } else {
           var isCur=item.path===c.path;
           var sz=item.size?'('+Math.round(item.size/1024*10)/10+'KB)':'';
-          html+='<div class="fp-item" onclick="fpSelectFile('+cardIdx+',\''+item.path+'\')" style="'+(isCur?'border-color:var(--green);color:var(--green)':'')+'">📄 '+item.name+' <span style="font-size:10px;color:var(--text2);margin-left:4px">'+sz+'</span>'+(isCur?' ✓':'')+' </div>';
+          var pE=item.path.replace(/'/g,"\\'");
+          html+='<div class="fp-item" onclick="fpSelectFile('+cardIdx+',\''+pE+'\')" style="'+(isCur?'border-color:var(--green);color:var(--green)':'')+'">'+
+            '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📄 '+item.name+' <span style="font-size:10px;color:var(--text2);margin-left:4px">'+sz+'</span>'+(isCur?' ✓':'')+'</span>'+
+            '<button class="file-act" title="Muat turun" onclick="event.stopPropagation();fpMuatTurunFail('+cardIdx+',\''+pE+'\')">⬇</button>'+
+            '<button class="file-act" title="Padam" style="border-color:var(--red);color:var(--red)" onclick="event.stopPropagation();fpPadamFail('+cardIdx+',\''+pE+'\')">🗑</button>'+
+          '</div>';
         }
       });
       list.innerHTML=html||'<div style="padding:16px;text-align:center;color:var(--text2)">Folder kosong</div>';
@@ -3505,6 +3573,78 @@ function fpBrowse(cardIdx,path){
     .catch(function(e){
       list.innerHTML='<div style="padding:16px;color:var(--red);font-size:13px;text-align:center">✕ '+e.message+'</div>';
     });
+}
+// ── Muat turun & padam fail terus dari senarai fail GitHub ──
+function _ghUrlFail(repo,path,branch){
+  return 'https://api.github.com/repos/'+repo+'/contents/'+path.split('/').map(encodeURIComponent).join('/')+'?ref='+encodeURIComponent(branch||'main');
+}
+async function repoMuatTurunFail(repo,branch,path){
+  var nama=path.split('/').pop();
+  var t=ghGetToken(),h={};
+  if(t) h['Authorization']='token '+t;
+  showNotif('⏳ Memuat turun '+nama+'...','info');
+  try{
+    var blob=null;
+    var r=await fetch(_ghUrlFail(repo,path,branch),{headers:Object.assign({'Accept':'application/vnd.github.raw'},h)}).catch(function(){return null;});
+    if(r&&r.ok) blob=await r.blob();
+    if(!blob){
+      var r2=await fetch(_ghUrlFail(repo,path,branch),{headers:Object.assign({'Accept':'application/vnd.github.v3+json'},h)});
+      var d=await r2.json();
+      if(!d||!d.download_url) throw new Error((d&&d.message)||'Fail tidak dijumpai');
+      var r3=await fetch(d.download_url);
+      if(!r3.ok) throw new Error('HTTP '+r3.status);
+      blob=await r3.blob();
+    }
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a'); a.href=url; a.download=nama;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){URL.revokeObjectURL(url);},3000);
+    showNotif('⬇ '+nama,'ok');
+  }catch(e){ showNotif('Gagal muat turun: '+e.message,'err'); }
+}
+async function repoPadamFail(repo,branch,path,selepas){
+  var t=ghGetToken();
+  if(!t){showNotif('Simpan API Key dahulu','err');return;}
+  if(!confirm('PADAM fail ini dari GitHub?\n\n'+repo+'/'+path+'\n\n(Ia dibuat sebagai commit — boleh dipulihkan dari sejarah commit di GitHub.)')) return;
+  var h={'Authorization':'token '+t,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
+  showNotif('⏳ Memadam '+path.split('/').pop()+'...','info');
+  try{
+    var r=await fetch(_ghUrlFail(repo,path,branch),{headers:h});
+    var d=await r.json();
+    if(!r.ok||!d||!d.sha) throw new Error((d&&d.message)||('HTTP '+r.status));
+    var r2=await fetch('https://api.github.com/repos/'+repo+'/contents/'+path.split('/').map(encodeURIComponent).join('/'),{
+      method:'DELETE',headers:h,
+      body:JSON.stringify({message:'Padam '+path+' via KodEdit',sha:d.sha,branch:branch||'main'})
+    });
+    if(!r2.ok){var e2=await r2.json().catch(function(){return {};});throw new Error(e2.message||('HTTP '+r2.status));}
+    showNotif('🗑 '+path.split('/').pop()+' dipadam','ok');
+    if(selepas) selepas();
+  }catch(e){ showNotif('Gagal padam: '+e.message,'err'); }
+}
+function fpMuatTurunFail(i,path){
+  var mf=_multiFiles[i]; if(!mf) return;
+  repoMuatTurunFail(mf.config.repo,mf.config.branch,path);
+}
+function fpPadamFail(i,path){
+  var mf=_multiFiles[i]; if(!mf) return;
+  repoPadamFail(mf.config.repo,mf.config.branch,path,function(){
+    if(path===mf.config.path){
+      mf.status='⚠ Fail ini telah dipadam dari GitHub'; mf.statusType='err';
+      multiRenderItem(i);
+    }
+    fpBrowse(i,_fpPath);
+  });
+}
+function ghBrowseMuatTurun(path){
+  var c=ghGetConfigs()[_ghBrowseIdx]; if(!c) return;
+  repoMuatTurunFail(c.repo,c.branch,path);
+}
+function ghBrowsePadam(path){
+  var c=ghGetConfigs()[_ghBrowseIdx]; if(!c) return;
+  repoPadamFail(c.repo,c.branch,path,function(){
+    if(S.fileRepo===c.repo&&S.filePath===path) showNotif('⚠ Fail yang sedang dibuka dalam editor telah dipadam dari GitHub','err');
+    ghFetchBrowse(_ghBrowsePath);
+  });
 }
 function fpSelectFile(cardIdx,filePath){
   var mf=_multiFiles[cardIdx]; if(!mf) return;
