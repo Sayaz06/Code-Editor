@@ -937,30 +937,23 @@ function ghLoadFromFirebase(callback){
       _ghAbaikan = d.abaikan||[];
       _ghGlobalLock = d.globalLock||false;
       if(ghKemasSenarai()) ghSaveToFirebase();
-      if(_ghGlobalLock){
-        var anyBlocked=_ghConfigs.some(function(c){ return c.deployBlocked; });
-        if(!anyBlocked){
-          _ghGlobalLock=false;
-          ghFbDoc().update({globalLock:false}).catch(function(){});
-        } else {
-          // auto check semua app yg blocked
-          setTimeout(function(){
-            ghSetGlobalLock(true);
-            _ghConfigs.forEach(function(c,i){
-              if(!c.deployBlocked) return;
-              var token=_ghToken;
-              if(!token) return;
-              fetch('https://api.github.com/repos/'+c.repo+'/pages/builds',{
-                headers:{'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json'}
-              }).then(function(r){return r.json();})
-              .then(function(data){
-                if(Array.isArray(data)&&data.length&&data[0].status==='built'){
-                  ghSetDeployBlock(i,false);
-                }
-              }).catch(function(){});
-            });
-          },1000);
-        }
+      // Kunci deploy lama (lebih 3 minit / tiada masa) dibuang — elak status "in progress" palsu
+      var kunciLama=false;
+      _ghConfigs.forEach(function(c){ if(c.deployBlocked&&!_ghKunciAktif(c)){ c.deployBlocked=false; kunciLama=true; } });
+      if(_ghGlobalLock){ _ghGlobalLock=false; kunciLama=true; }
+      if(kunciLama) ghSaveToFirebase();
+      var token0=_ghToken;
+      if(token0){
+        _ghConfigs.forEach(function(c,i){
+          if(!_ghKunciAktif(c)) return;
+          fetch('https://api.github.com/repos/'+c.repo+'/pages/builds',{
+            headers:{'Authorization':'token '+token0,'Accept':'application/vnd.github.v3+json'}
+          }).then(function(r){return r.json();})
+          .then(function(data){
+            var siap=!Array.isArray(data)||!data.length||data[0].status==='built'||data[0].status==='errored';
+            if(siap) ghSetDeployBlock(i,false);
+          }).catch(function(){});
+        });
       }
     }
     if(callback) callback();
@@ -1357,8 +1350,10 @@ if(st==='built'){
         } else {
           ds.style.color='var(--text2)'; ds.textContent='Status: '+st;
         }
-      } else if(data.message){
-        ds.style.color='var(--red)'; ds.textContent='✕ '+data.message;
+      } else {
+        if(S.origDeployBlocked) ghSetOrigBlock(false);
+        ds.style.color='var(--text2)';
+        ds.textContent=(data&&data.message==='Not Found')?'ℹ Repo ini tiada GitHub Pages — tiada build untuk ditunggu':'✕ '+((data&&data.message)||'Tiada data build');
       }
     }).catch(function(e){
       if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
@@ -1367,7 +1362,7 @@ if(st==='built'){
 
 function ghDeployOriginal(){
   if(!S.filePath||!S.fileRepo){showNotif('Tiada fail GitHub dibuka','err');return;}
-  if(_ghGlobalLock||S.origDeployBlocked){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
+  if(S.origDeployBlocked&&(Date.now()-(S.origDeployTime||0))<180000){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
   var token=ghGetToken();
   if(!token){showNotif('Simpan API Key dahulu','err');return;}
   var content=inp().value;
@@ -1428,7 +1423,7 @@ function ghRenderList(){
     html='<div style="text-align:center;color:var(--text2);font-size:13px;padding:16px">Tiada app lagi. Tekan 🔄 Segerak dari GitHub.</div>';
   }
   list.forEach(function(c,i){
-    var blocked=_ghGlobalLock||c.deployBlocked||false;
+    var blocked=_ghKunciAktif(c);
     html+='<div class="file-item" style="flex-wrap:wrap;gap:6px" id="gh-item-'+i+'">'+
       '<div class="file-info" style="flex:0 0 100%;min-width:0">'+
         '<div class="file-name">'+c.name+(c.auto?' <span style="font-size:10px;color:var(--accent);border:1px solid var(--accent);border-radius:4px;padding:0 4px;margin-left:4px">auto</span>':'')+'</div>'+
@@ -1728,12 +1723,10 @@ function ghCheckStatus(idx){
           ds.style.color='var(--text2)';
           ds.textContent='Status: '+st;
         }
-      } else if(data.message){
-        ds.style.color='var(--red)';
-        ds.textContent='✕ '+data.message;
       } else {
+        if(c.deployBlocked) ghSetDeployBlock(idx, false);
         ds.style.color='var(--text2)';
-        ds.textContent='Tiada data build';
+        ds.textContent=(data&&data.message==='Not Found')?'ℹ Repo ini tiada GitHub Pages — tiada build untuk ditunggu':(data&&data.message?'✕ '+data.message:'Tiada data build');
       }
     })
     .catch(function(e){
@@ -1743,27 +1736,17 @@ function ghCheckStatus(idx){
 
 var _ghGlobalLock=false;
 
+// Kunci deploy hanya untuk app yang baru di-deploy, dan tamat sendiri selepas 3 minit
+function _ghKunciAktif(c){
+  return !!(c&&c.deployBlocked&&c.deployTime&&(Date.now()-c.deployTime)<180000);
+}
+
 function ghSetGlobalLock(locked){
-  _ghGlobalLock=locked;
-  document.querySelectorAll('#gh-apps-list .btn.success').forEach(function(btn){
-    btn.disabled=locked;
-    btn.style.opacity=locked?'0.5':'1';
-    btn.style.cursor=locked?'not-allowed':'pointer';
-  });
-  var origBtn=document.getElementById('btn-deploy-orig');
-  if(origBtn){
-    origBtn.disabled=locked;
-    origBtn.style.opacity=locked?'0.5':'1';
-    origBtn.style.cursor=locked?'not-allowed':'pointer';
-  }
+  // Kunci global dimatikan — ia menyebabkan SEMUA app nampak "Deployment in progress".
+  // Setiap app kini dikunci sendiri (deployBlocked) selama maksimum 3 minit.
+  _ghGlobalLock=false;
   var lockNote=document.getElementById('gh-orig-lock-note');
-  if(lockNote) lockNote.style.display=locked?'block':'none';
-  // simpan ke Firestore
-  if(currentUser){
-    ghFbDoc().update({globalLock: locked}).catch(function(){
-      ghSaveToFirebase();
-    });
-  }
+  if(lockNote) lockNote.style.display='none';
 }
 
 function ghSetDeployBlock(idx, blocked){
@@ -1830,7 +1813,7 @@ function ghDoActualDeploy(apiUrl, headers, content, sha, c, status, ds, idx){
 
 function ghDeploy(idx){
   var list=ghGetConfigs(); var c=list[idx]; if(!c) return;
-  if(_ghGlobalLock||c.deployBlocked){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
+  if(_ghKunciAktif(c)){showNotif('Deploy sedang diproses — tekan 🔍 untuk check status','err');return;}
   var token=ghGetToken();
   if(!token){showNotif('Simpan API Key dahulu dalam tab 🔑','err');return;}
   var content=inp().value;
