@@ -989,6 +989,9 @@ function ghKemasSenarai(){
     seen[k]=baru.length; baru.push(c);
   });
   _ghConfigs=baru;
+  var adaRepo={};
+  baru.forEach(function(c){adaRepo[c.repo.toLowerCase()]=1;});
+  _ghAbaikan=_ghAbaikan.filter(function(r){return !adaRepo[r];});
   return baru.length!==lama||_ghAbaikan.length!==abaiLama;
 }
 
@@ -1436,7 +1439,10 @@ function ghRenderList(){
       '<button class="btn danger" style="flex:none;padding:6px 10px" onclick="ghDeleteConfig('+i+')" title="Buang dari senarai">🗑</button>'+
     '</div>';
   });
-  var ab=_ghAbaikan||[];
+  var adaRepo={};
+  list.forEach(function(c){adaRepo[(c.repo||'').toLowerCase()]=1;});
+  _ghAbaikan=(_ghAbaikan||[]).filter(function(r){return !adaRepo[r];});
+  var ab=_ghAbaikan;
   if(ab.length){
     html+='<div style="text-align:center;margin-top:6px"><button class="tool-btn" onclick="_ghShowHidden=!_ghShowHidden;ghRenderList()" style="padding:4px 10px;font-size:11px">'+
       (_ghShowHidden?'Sorok senarai yang dibuang':'🗑 Repo yang dibuang ('+ab.length+')')+'</button></div>';
