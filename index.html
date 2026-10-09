@@ -1168,6 +1168,26 @@ function ftTap(path,type,name){
   }
 }
 
+// Fetch JSON dari GitHub API dengan selamat:
+// - elak cache (service worker / browser) dengan no-store + cap masa
+// - kalau dapat halaman HTML (<!DOCTYPE...) bukan JSON → cuba sekali lagi, lepas tu bagi mesej jelas
+function _ghJsonSelamat(url,headers,cubaan){
+  cubaan=cubaan||0;
+  var u=url+(url.indexOf('?')<0?'?':'&')+'_t='+Date.now();
+  return fetch(u,{headers:headers,cache:'no-store'})
+    .then(function(r){ return r.text().then(function(t){ return {r:r,t:t}; }); })
+    .then(function(x){
+      var t=(x.t||'').replace(/^\s+/,'');
+      if(t.charAt(0)==='<'){
+        if(cubaan<1) return new Promise(function(ok){setTimeout(ok,1200);}).then(function(){ return _ghJsonSelamat(url,headers,cubaan+1); });
+        throw new Error('GitHub tak dapat dihubungi (dapat halaman web, bukan data). Semak internet / WiFi, kemudian cuba lagi.');
+      }
+      var d;
+      try{ d=JSON.parse(t); }catch(e){ throw new Error('Jawapan GitHub rosak (HTTP '+x.r.status+'). Cuba lagi.'); }
+      return d;
+    });
+}
+
 function ghFetchBrowse(path){
   var list=ghGetConfigs(); var c=list[_ghBrowseIdx]; if(!c) return;
   var token=ghGetToken();
@@ -1180,8 +1200,7 @@ function ghFetchBrowse(path){
   var apiUrl='https://api.github.com/repos/'+c.repo+'/contents/'+(path||'')+'?ref='+c.branch;
   var headers={'Accept':'application/vnd.github.v3+json'};
   if(token) headers['Authorization']='token '+token;
-  fetch(apiUrl,{headers:headers})
-    .then(function(r){return r.json();})
+  _ghJsonSelamat(apiUrl,headers)
     .then(function(data){
       if(!Array.isArray(data)){
         browseList.innerHTML='<div style="color:var(--red);font-size:13px;padding:10px">✕ '+(data.message||'Gagal')+'</div>';
@@ -1240,9 +1259,9 @@ function ghBrowseOpen(path){
     showNotif('Dibuka dari GitHub: '+path,'ok');
   }
 
-  fetch(apiUrl,{headers:headers})
-    .then(function(r){return r.json();})
+  _ghJsonSelamat(apiUrl,headers)
     .then(function(data){
+      if(data&&data.message&&!data.content&&!data.download_url) throw new Error(data.message);
       // fail kecil — ada content base64
       if(data.content){
         try{
