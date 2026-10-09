@@ -1394,33 +1394,43 @@ S.origDeployTime=Date.now();
   if(ds){ ds.style.color='var(--accent)'; ds.textContent='⏳ Deploying...'; }
   var apiUrl='https://api.github.com/repos/'+S.fileRepo+'/contents/'+S.filePath;
   var headers={'Authorization':'token '+token,'Accept':'application/vnd.github.v3+json','Content-Type':'application/json'};
-  fetch(apiUrl+'?ref='+S.fileBranch,{headers:headers})
-    .then(function(r){return r.json();})
+  _ghJsonSelamat(apiUrl+'?ref='+S.fileBranch,headers)
     .then(function(data){
+      if(!data.sha && data.message && data.message!=='Not Found') throw new Error(data.message);
       var body={message:'Update '+S.filePath+' via KodEdit',content:btoa(unescape(encodeURIComponent(content))),branch:S.fileBranch};
       if(data.sha) body.sha=data.sha;
-      return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body)});
+      return fetch(apiUrl,{method:'PUT',headers:headers,body:JSON.stringify(body),cache:'no-store'});
     })
-    .then(function(r){return r.json();})
+    .then(function(r){
+      return r.text().then(function(t){
+        t=(t||'').replace(/^\s+/,'');
+        if(t.charAt(0)==='<') throw new Error('GitHub tak dapat dihubungi semasa hantar (dapat halaman web). Semak internet / WiFi, kemudian cuba lagi.');
+        try{ return JSON.parse(t); }catch(e){ throw new Error('Jawapan GitHub rosak (HTTP '+r.status+')'); }
+      });
+    })
     .then(function(data){
       if(data.content){
         status.style.color='var(--green)';
         status.textContent='✓ Deploy berjaya: '+S.filePath;
+        if(ds){ ds.style.color='var(--green)'; ds.textContent='✓ Deploy berjaya — tunggu Pages build'; }
         showNotif('🚀 Deploy berjaya!','ok');
         ghSetGlobalLock(true);
         ghSetOrigBlock(true);
         setTimeout(function(){ ghCheckOrigStatus(); }, 30000);
       } else {
+        var sebab=data.message||'Gagal';
         status.style.color='var(--red)';
-        status.textContent='✕ '+(data.message||'Gagal');
-        showNotif('Deploy gagal','err');
+        status.textContent='✕ '+sebab;
+        if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+sebab; }
+        showNotif('Deploy gagal: '+sebab,'err');
         ghSetGlobalLock(false);
         ghSetOrigBlock(false);
       }
     })
     .catch(function(e){
       status.style.color='var(--red)'; status.textContent='✕ '+e.message;
-      showNotif('Deploy gagal','err');
+      if(ds){ ds.style.color='var(--red)'; ds.textContent='✕ '+e.message; }
+      showNotif('Deploy gagal: '+e.message,'err');
       ghSetGlobalLock(false);
       ghSetOrigBlock(false);
     });
