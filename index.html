@@ -3431,6 +3431,7 @@ function multiRenderItemHTML(i){
         '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
+        '<button class="tool-btn" onclick="kodResetSite(\''+_rp[0]+'\')" title="Salin pautan tetapan data Chrome untuk reset" style="border-color:var(--red);color:var(--red)">🧹 Reset</button>'+
         '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>👁 Preview</button>'+
         '<button class="tool-btn" onclick="multiImportToEditor('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="border-color:var(--amber);color:var(--amber)">📝 Edit</button>'+
     '</div>'+
@@ -3461,15 +3462,16 @@ function multiRenderItemHTML(i){
         '<button class="tool-btn" onclick="multiSetTarget('+i+');rpShowTab(\'bulk\');openPanel(\'replace-panel\')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⚡ Ganti Pukal</button>'+
         '<button class="tool-btn" onclick="multiSwitchFile('+i+')" style="border-color:var(--amber);color:var(--amber)">📂 Fail</button>'+
         '<button class="tool-btn" onclick="strukturFailKad('+i+')" style="border-color:var(--green);color:var(--green)">🧬 Struktur</button>'+
-        '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
+      '<button class="tool-btn" onclick="multiDeployOne('+i+')" '+(mf.loaded&&!mf.deploying?'':'disabled style="opacity:0.4"')+'>🚀 Deploy</button>'+
         '<button class="tool-btn" onclick="multiDownloadOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>⬇ DL</button>'+
         '<button class="tool-btn" onclick="multiRefreshOne('+i+')">↺ Muat</button>'+
         '<button class="tool-btn" onclick="multiCheckStatus('+i+')" style="border-color:var(--accent);color:var(--accent)">🔍</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghFile+'\',\'_blank\')" style="border-color:var(--green);color:var(--green)">🌐 Fail</button>'+
         '<button class="tool-btn" onclick="window.open(\''+_ghBase+'\',\'_blank\')" style="border-color:var(--accent2);color:var(--accent2)">🌐 App</button>'+
+        '<button class="tool-btn" onclick="kodResetSite(\''+_rp[0]+'\')" title="Salin pautan tetapan data Chrome untuk reset" style="border-color:var(--red);color:var(--red)">🧹 Reset</button>'+
         '<button class="tool-btn" onclick="multiPreviewOne('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+'>👁 Preview</button>'+
         '<button class="tool-btn" onclick="multiImportToEditor('+i+')" '+(mf.loaded?'':'disabled style="opacity:0.4"')+' style="border-color:var(--amber);color:var(--amber)">📝 Edit</button>'+
-      '</div>'+
+    '</div>'+
       '<textarea id="multi-ta-'+i+'" oninput="multiOnEdit('+i+')" spellcheck="false" autocomplete="off" autocorrect="off" autocapitalize="off" wrap="off" placeholder="☁ kod disimpan awan..." '+(mf.loaded?'':'disabled')+' style="flex:0 0 65px;width:65px;height:52px;resize:none;white-space:pre;overflow:hidden;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text);font-family:monospace;font-size:10px;line-height:1.4;padding:4px 6px;box-sizing:border-box;outline:none">'+taEsc+'</textarea>'+
     '</div>'+
   '</div>';
@@ -3573,6 +3575,20 @@ function multiCheckStatus(i){
 }
 
 var _fpCardIdx=-1;
+// Reset data app: Chrome TIDAK benarkan web buka pautan chrome:// — jadi kita salin pautan,
+// user tampal di address bar. Pautan sama untuk semua app <owner>.github.io (ikut domain, bukan repo).
+function kodResetSite(owner){
+  var host='https://'+String(owner||'sayaz06').toLowerCase()+'.github.io';
+  var url='chrome://settings/content/siteDetails?site='+encodeURIComponent(host);
+  var siap=function(){
+    alert('Pautan reset disalin:\n\n'+url+'\n\n1) Buka tab baru\n2) Tampal di address bar & tekan Enter\n3) Tekan "Delete data"\n\nAMARAN: Ini padam data SEMUA app di '+host.replace('https://','')+' (termasuk KodEdit jika dibuka dari situ) — fail tempatan yang belum disimpan ke Firebase/GitHub akan hilang.');
+  };
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(url).then(siap).catch(function(){ prompt('Salin pautan ini:',url); });
+  } else {
+    prompt('Salin pautan ini:',url);
+  }
+}
 // Buka repo semasa (dalam pemilih fail) di GitHub: https://github.com/<owner>/<repo>
 function fpBukaGithub(){
   var mf=_multiFiles[_fpCardIdx];
