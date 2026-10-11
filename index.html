@@ -344,6 +344,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
   <div style="background:var(--surface);border-radius:16px 16px 0 0;width:100%;max-height:72vh;display:flex;flex-direction:column">
     <div style="padding:12px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-shrink:0">
       <span style="font-size:13px;font-weight:600;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="filepick-title">Pilih Fail</span>
+      <button class="tool-btn" onclick="fpBukaGithub()" title="Buka repo ini di GitHub" style="padding:0 8px;height:26px;font-size:11px;border-color:var(--text2);color:var(--text);flex-shrink:0">🐙 GitHub</button>
       <button class="tool-btn" onclick="fpFailBaru()" style="padding:0 8px;height:26px;font-size:11px;border-color:var(--green);color:var(--green);flex-shrink:0">➕ Baru</button>
       <button class="tool-btn" onclick="fpMuatTurunSemua()" style="padding:0 8px;height:26px;font-size:11px;border-color:var(--accent2);color:var(--accent2);flex-shrink:0">⬇ Semua</button>
       <button class="tool-btn" onclick="hideFilePicker()" style="padding:0 8px;height:26px;font-size:11px;flex-shrink:0">✕ Tutup</button>
@@ -3571,6 +3572,14 @@ function multiCheckStatus(i){
 }
 
 var _fpCardIdx=-1;
+// Buka repo semasa (dalam pemilih fail) di GitHub: https://github.com/<owner>/<repo>
+function fpBukaGithub(){
+  var mf=_multiFiles[_fpCardIdx];
+  if(!mf||!mf.config||!mf.config.repo){showNotif('Repo tidak diketahui','err');return;}
+  var repo=String(mf.config.repo).replace(/^\/+|\/+$/g,'');
+  if(repo.indexOf('/')<0) repo='Sayaz06/'+repo;
+  window.open('https://github.com/'+repo,'_blank');
+}
 function multiSwitchFile(i){
   _fpCardIdx=i;
   var mf=_multiFiles[i]; if(!mf) return;
