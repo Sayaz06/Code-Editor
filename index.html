@@ -3580,14 +3580,17 @@ var _fpCardIdx=-1;
 function kodResetSite(owner){
   var host='https://'+String(owner||'sayaz06').toLowerCase()+'.github.io';
   var url='chrome://settings/content/siteDetails?site='+encodeURIComponent(host);
-  var siap=function(){
-    alert('Pautan reset disalin:\n\n'+url+'\n\n1) Buka tab baru\n2) Tampal di address bar & tekan Enter\n3) Tekan "Delete data"\n\nAMARAN: Ini padam data SEMUA app di '+host.replace('https://','')+' (termasuk KodEdit jika dibuka dari situ) — fail tempatan yang belum disimpan ke Firebase/GitHub akan hilang.');
+  var salinLama=function(){
+    var ta=document.createElement('textarea');
+    ta.value=url; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); showNotif('📋 Pautan reset disalin','ok'); }
+    catch(e){ showNotif('Gagal salin','err'); }
+    document.body.removeChild(ta);
   };
   if(navigator.clipboard&&navigator.clipboard.writeText){
-    navigator.clipboard.writeText(url).then(siap).catch(function(){ prompt('Salin pautan ini:',url); });
-  } else {
-    prompt('Salin pautan ini:',url);
-  }
+    navigator.clipboard.writeText(url).then(function(){ showNotif('📋 Pautan reset disalin','ok'); }).catch(salinLama);
+  } else salinLama();
 }
 // Buka repo semasa (dalam pemilih fail) di GitHub: https://github.com/<owner>/<repo>
 function fpBukaGithub(){
